@@ -45,66 +45,23 @@ const (
 )
 
 func main() {
-	var input string     //для хранения директории с медиафайлами
 	fileExt := []string{ //обрабатываемые файлы
 		".jpg", ".jpeg", ".arw", ".png", ".nef", ".cr2",
 		".mts", ".mp4", ".3gp", ".m4v", ".mov", ".avi",
 	}
-	// if fileExists("/usr/bin/exiftool") {
-	// 	fmt.Println("ExifTool here")
-	// } else {
-	// 	log.Fatal("Install ExifTool first")
-	// }
-	if len(os.Args) == 2 {
-		input = os.Args[1]
-		if !checkPath(input) {
-			log.Fatal("Dir is not exist")
-		}
-	} else {
-		fmt.Print("Put collection path: ")
-		reader := bufio.NewReader(os.Stdin)
-		inputData, err := reader.ReadString('\n')
-		check(err)
-		input = strings.TrimSpace(inputData)
-		if !checkPath(input) {
-			log.Fatal("Dir is not exist")
-		}
-		fmt.Printf("Your choise is a: %v\n", input)
-	}
-	os.Chdir(input)
+	workDir := getConfig()
 	log.Println("=== App started ===")
-	subDirToSkip := "skip"
+	dirFiles := walkingOnFilesystem(workDir, fileExt)
+	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
+	patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
+	patternDateInName2 := `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                         //шаблон файлов имеющих дату в имени
+	patternDateInName3 := `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}`   //шаблон файлов имеющих дату в имени
+	mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
+	mustCompile2 := regexp.MustCompile(`^(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{6})`)
+	mustCompile3 := regexp.MustCompile(`^.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})`)
 
-	dirFiles := make(map[string]string) //key- полный путь; val- полное имя файла
-
-	fmt.Println("On filesystem:")
-	err := filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
-			return err
-		}
-		if info.IsDir() && info.Name() == subDirToSkip {
-			fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
-			return filepath.SkipDir
-		}
-		fmt.Printf("visited file or dir: %q\n", path)
-
-		//проверка на подходящее расширение файла (в нижнем регистре) со слайса fileExt
-		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
-			dirFiles[path] = filepath.Base(path)
-		}
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("error walking the path %q: %v\n", input, err)
-		log.Fatal(err)
-	}
 	for key, val := range dirFiles {
 		fmt.Println(key, "    ", val)
-		patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
-		patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
-		// patternDateInName2 := `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                          //шаблон файлов имеющих дату в имени
-		patternDateInNameLong := `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}` //шаблон файлов имеющих дату в имени
 		matched := match(patternToSkip, val)
 
 		if matched {
@@ -113,14 +70,16 @@ func main() {
 		} else {
 			switch {
 			case match(patternDateInName, val):
-				r := regexp.MustCompile(`^[A-Z]{3}_(?P<one>\d{8})_(?P<two>\d{6})`)
-				nameSlice := r.FindStringSubmatch(val)
+				nameSlice := mustCompile1.FindStringSubmatch(val)
 				nameSlice = nameSlice[1:] //убираю элемент в котором содержится val
 				newName := nameSlice[0] + "_" + nameSlice[1]
 				renamer(key, newName)
-			case match(patternDateInNameLong, val):
-				r := regexp.MustCompile(`^.*\(?P<one>\d{4})[_:-](?P<two>\d{2})[_:-](?P<three>\d{2})[_:-](?P<four>\d{2})[_:-](?P<five>\d{2})[_:-](?P<six>\d{2})`)
-				nameSlice := r.FindStringSubmatch(val)
+			case match(patternDateInName2, val):
+				nameSlice := mustCompile2.FindStringSubmatch(val)
+				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
+				renamer(key, newName)
+			case match(patternDateInName3, val):
+				nameSlice := mustCompile3.FindStringSubmatch(val)
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
 				renamer(key, newName)
 			default:
@@ -140,12 +99,65 @@ func main() {
 		}
 	}
 } //main END
-
+func puts(s ...string) {
+	fmt.Println(s)
+}
 func check(err error) {
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
+}
+func getConfig() string { //получаю каталог который необходимо обработать
+	var input string
+
+	if len(os.Args) == 2 {
+		input = os.Args[1]
+		if !checkPath(input) {
+			log.Fatal("Dir is not exist")
+		}
+	} else {
+		fmt.Print("Put collection path: ")
+		reader := bufio.NewReader(os.Stdin)
+		inputData, err := reader.ReadString('\n')
+		check(err)
+		input = strings.TrimSpace(inputData)
+		if !checkPath(input) {
+			log.Fatal("Dir is not exist")
+		}
+		fmt.Printf("Your choise is a: %v\n", input)
+	}
+	return input
+}
+func walkingOnFilesystem(workDir string, fileExt []string) map[string]string {
+	fmt.Println("Walking on filesystem:")
+
+	subDirToSkip := "skip"
+	dirFiles := make(map[string]string) //для хранения всего списка подходящих файлов, где: key- полный путь; val- полное имя файла
+
+	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
+		}
+		if info.IsDir() && info.Name() == subDirToSkip {
+			fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
+			return filepath.SkipDir
+		}
+		fmt.Printf("visited file or dir: %q\n", path)
+
+		//проверка на подходящее расширение файла (в нижнем регистре) со слайса fileExt
+		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
+			dirFiles[path] = filepath.Base(path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("error walking the path %q: %v\n", workDir, err)
+		log.Fatal(err)
+	}
+
+	return dirFiles
 }
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
@@ -175,17 +187,22 @@ func match(pattern string, text string) bool {
 	return m
 }
 func renamer(fullPath string, newName string) {
+	puts("====================================================================================================")
+	puts("fullpath: ", fullPath)
+	puts("newname ---> ", newName)
 	path := filepath.Dir(fullPath) + "/"
 	extFile := filepath.Ext(fullPath)
-	if fileExists(path + newName + extFile) {
-		// shortName := strings.ReplaceAll(newName, extFile, "")
-		for count := 0; fileExists(path + newName + extFile); {
-			count++
-			newName = newName + "(" + strconv.Itoa(count) + ")"
+	fullNewName := path + newName + extFile
+	if fileExists(fullNewName) {
+		nextName := newName
+		for count := 1; fileExists(path + nextName + extFile); count++ {
+			nextName = newName + "(" + strconv.Itoa(count) + ")"
 		}
+		fullNewName = path + nextName + extFile
+		puts("New newName: ", fullNewName)
 	}
 
-	err := os.Rename(fullPath, newName+extFile)
+	err := os.Rename(fullPath, fullNewName)
 	check(err)
 }
 func getExif(filePath string) (time.Time, error) {
