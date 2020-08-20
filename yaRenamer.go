@@ -71,8 +71,7 @@ func main() {
 			switch {
 			case match(patternDateInName, val):
 				nameSlice := mustCompile1.FindStringSubmatch(val)
-				nameSlice = nameSlice[1:] //убираю элемент в котором содержится val
-				newName := nameSlice[0] + "_" + nameSlice[1]
+				newName := nameSlice[1] + "_" + nameSlice[2]
 				renamer(key, newName)
 			case match(patternDateInName2, val):
 				nameSlice := mustCompile2.FindStringSubmatch(val)
