@@ -255,14 +255,19 @@ func getExif(et *exiftool.Exiftool, filePath string) (time.Time, error) {
 		// [FileModifyDate] 	2019:01:14 11:08:20+02:00
 		tLayout3 := "2006:01:02 15:04:05-07:00"
 		if exifTime, err := fileInfo.GetString("CreateDate"); err == nil {
+			puts("Exif field <<<CreateDate>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("DateTimeOriginal"); err == nil {
+			puts("Exif field <<<DateTimeOriginal>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("Date"); err == nil {
+			puts("Exif field <<<Date>>> matched")
 			return parseExifTime(tLayout2, exifTime)
 		} else if exifTime, err := fileInfo.GetString("ModifyDate"); err == nil {
+			puts("Exif field <<<ModifyDate>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("FileModifyDate"); err == nil {
+			puts("Exif field <<<FileModifyDate>>> matched")
 			return parseExifTime(tLayout3, exifTime)
 		}
 	}
