@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -11,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rwcarlsen/goexif/exif"
-	"github.com/rwcarlsen/goexif/mknote"
+	"github.com/barasher/go-exiftool"
 )
 
 const (
+	verbose           = false
 	stdLongMonth      = "January"
 	stdMonth          = "Jan"
 	stdNumMonth       = "1"
@@ -46,12 +47,37 @@ const (
 
 func main() {
 	fileExt := []string{ //обрабатываемые файлы
-		".jpg", ".jpeg", ".arw", ".png", ".nef", ".cr2",
-		".mts", ".mp4", ".3gp", ".m4v", ".mov", ".avi",
+		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
+		".AIF", ".AIFC", ".APE", ".ARQ", ".ARW", ".ASF", ".AVI", ".AVIF", ".BMP", ".DIB", ".BPG", ".BTF", ".CHM", ".COS", ".CR2", ".CR3",
+		".CRW", ".CIFF", ".CS1", ".CSV", ".DCM", ".DC3", ".DIC", ".DICM", ".DCP", ".DCR", ".DFONT", ".DIVX", ".DJVU", ".DJV", ".DNG",
+		".DOC", ".DOT", ".DOCX", ".DOCM", ".DOTX", ".DOTM", ".DPX", ".DR4", ".DYLIB", ".DV", ".DVB", ".DVR-MS", ".EIP", ".EPS", ".EPSF",
+		".PS", ".EPUB", ".ERF", ".EXE", ".DLL", ".EXIF", ".EXR", ".EXV", ".F4A", ".F4B", ".F4P", ".F4V", ".FFF", ".FFF", ".FLA", ".FLAC",
+		".FLIF", ".FLV", ".FPF", ".FPX", ".GIF", ".GPR", ".GZ", ".GZIP", ".HDP", ".WDP", ".JXR", ".HDR", ".HEIC", ".HEIF", ".HIF", ".HTML",
+		".HTM", ".XHTML", ".ICC", ".ICM", ".ICS", ".ICAL", ".IDML", ".IIQ", ".IND", ".INDD", ".INDT", ".INSV", ".INX", ".ISO", ".ITC", ".J2C",
+		".J2K", ".JPC", ".JP2", ".JPF", ".JPM", ".JPX", ".JPEG", ".JPG", ".JPE", ".JSON", ".K25", ".KDC", ".KEY", ".KTH", ".LA", ".LFP",
+		".LFR", ".LNK", ".LRV", ".M2TS", ".MTS", ".M2T", ".TS", ".M4A", ".M4B", ".M4P", ".M4V", ".MAX", ".MEF", ".MIE", ".MIFF", ".MIF",
+		".MKA", ".MKV", ".MKS", ".MOBI", ".AZW", ".AZW3", ".MODD", ".MOI", ".MOS", ".MOV", ".QT", ".MP3", ".MP4", ".MPC", ".MPEG", ".MPG",
+		".M2V", ".MPO", ".MQV", ".MRW", ".MXF", ".NEF", ".NMBTEMPLATE", ".NRW", ".NUMBERS", ".O", ".ODB", ".ODC", ".ODF", ".ODG", ".", ".ODI",
+		".ODP", ".ODS", ".ODT", ".OFR", ".OGG", ".OGV", ".OPUS", ".ORF", ".OTF", ".PAC", ".PAGES", ".PCD", ".PCX", ".PDB", ".PRC", ".PDF",
+		".PEF", ".PFA", ".PFB", ".PFM", ".PGF", ".PICT", ".PCT", ".PLIST", ".PMP", ".PNG", ".JNG", ".MNG", ".PPM", ".PBM", ".PGM", ".PPT",
+		".PPS", ".POT", ".POTX", ".POTM", ".PPAX", ".PPAM", ".PPSX", ".PPSM", ".PPTX", ".PPTM", ".PSD", ".PSB", ".PSDT", ".PSP", ".PSPIMAGE",
+		".QTIF", ".QTI", ".QIF", ".R3D", ".RA", ".RAF", ".RAM", ".RPM", ".RAR", ".RAW", ".RAW", ".RIFF", ".RIF", ".RM", ".RV", ".RMVB", ".RSRC",
+		".RTF", ".RW2", ".RWL", ".RWZ", ".SEQ", ".SKETCH", ".SO", ".SR2", ".SRF", ".SRW", ".SVG", ".SWF", ".THM", ".THMX", ".TIFF", ".TIF", ".TTF",
+		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
+		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
 	workDir := getConfig()
 	log.Println("=== App started ===")
 	dirFiles := walkingOnFilesystem(workDir, fileExt)
+	if len(dirFiles) < 1 {
+		fmt.Println("Nothin to do!\nBye :)")
+		os.Exit(0)
+	}
+	et, err := exiftool.NewExiftool()
+	defer et.Close()
+	if err != nil {
+		panic(fmt.Errorf("Error when intializing: %v", err))
+	}
 	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
 	patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
 	patternDateInName2 := `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                         //шаблон файлов имеющих дату в имени
@@ -82,9 +108,11 @@ func main() {
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
 				renamer(key, newName)
 			default:
-				exifData, err := getExif(key)
+				exifData, err := getExif(et, key)
 				if err != nil { //если не получилось вынуть exif
-					log.Println("Exif data FAILED -> go to filesystem maketime data")
+					fmt.Println("===> exifData: ", exifData)
+					fmt.Println("===> error: ", err)
+					log.Println("Exif data FAILED -> go to filesystem maketime data: ", key)
 					fInfo, err := os.Stat(key)
 					check(err)
 					fTimestamp := fInfo.ModTime()
@@ -128,7 +156,7 @@ func getConfig() string { //получаю каталог который нео�
 	return input
 }
 func walkingOnFilesystem(workDir string, fileExt []string) map[string]string {
-	fmt.Println("Walking on filesystem:")
+	// fmt.Println("Walking on filesystem:")
 
 	subDirToSkip := "skip"
 	dirFiles := make(map[string]string) //для хранения всего списка подходящих файлов, где: key- полный путь; val- полное имя файла
@@ -142,7 +170,7 @@ func walkingOnFilesystem(workDir string, fileExt []string) map[string]string {
 			fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
 			return filepath.SkipDir
 		}
-		fmt.Printf("visited file or dir: %q\n", path)
+		// fmt.Printf("visited file or dir: %q\n", path)
 
 		//проверка на подходящее расширение файла (в нижнем регистре) со слайса fileExt
 		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
@@ -174,7 +202,7 @@ func checkPath(somePath string) bool {
 }
 func find(slice []string, val string) (int, bool) {
 	for i, item := range slice {
-		if item == val {
+		if strings.ToLower(item) == val {
 			return i, true
 		}
 	}
@@ -204,25 +232,47 @@ func renamer(fullPath string, newName string) {
 	err := os.Rename(fullPath, fullNewName)
 	check(err)
 }
-func getExif(filePath string) (time.Time, error) {
+func getExif(et *exiftool.Exiftool, filePath string) (time.Time, error) {
 	fname := filePath
 
-	f, err := os.Open(fname)
-	check(err)
-
-	exif.RegisterParsers(mknote.All...)
-
-	x, err := exif.Decode(f)
-	if err != nil {
-		f.Close()
+	fileInfos := et.ExtractMetadata(fname)
+	for _, fileInfo := range fileInfos {
+		if fileInfo.Err != nil {
+			fmt.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
+			continue
+		}
+		if verbose {
+			for k, v := range fileInfo.Fields {
+				fmt.Printf("[%v] %v\n", k, v)
+			}
+		}
+		// [CreateDate] 		2008:06:18 22:02:45
+		// [DateTimeOriginal] 	2008:06:18 22:02:45
+		// [ModifyDate] 		2008:06:18 22:02:45
+		tLayout1 := "2006:01:02 15:04:05"
+		// [Date] 				2020:03:02 12:57:46.145865+02:00
+		tLayout2 := "2006:01:02 15:04:05.999999-07:00"
+		// [FileModifyDate] 	2019:01:14 11:08:20+02:00
+		tLayout3 := "2006:01:02 15:04:05-07:00"
+		if exifTime, err := fileInfo.GetString("CreateDate"); err == nil {
+			puts("Exif field <<<CreateDate>>> matched")
+			return parseExifTime(tLayout1, exifTime)
+		} else if exifTime, err := fileInfo.GetString("DateTimeOriginal"); err == nil {
+			puts("Exif field <<<DateTimeOriginal>>> matched")
+			return parseExifTime(tLayout1, exifTime)
+		} else if exifTime, err := fileInfo.GetString("Date"); err == nil {
+			puts("Exif field <<<Date>>> matched")
+			return parseExifTime(tLayout2, exifTime)
+		} else if exifTime, err := fileInfo.GetString("ModifyDate"); err == nil {
+			puts("Exif field <<<ModifyDate>>> matched")
+			return parseExifTime(tLayout1, exifTime)
+		} else if exifTime, err := fileInfo.GetString("FileModifyDate"); err == nil {
+			puts("Exif field <<<FileModifyDate>>> matched")
+			return parseExifTime(tLayout3, exifTime)
+		}
 	}
-
-	tm, _ := x.DateTime()
-	fmt.Println("Taken: ", tm)
-
-	if f.Close() != nil {
-		fmt.Println(err)
-	}
-
-	return tm, err
+	return time.Time{}, errors.New("ERROR: exif data corrupted")
+}
+func parseExifTime(layout string, it string) (time.Time, error) {
+	return time.Parse(layout, it)
 }
