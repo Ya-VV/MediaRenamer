@@ -57,14 +57,20 @@ type processingAttr struct {
 var exiftoolExist bool
 
 func main() {
-	out, err := exec.Command("/usr/bin/env exiftool -ver").Output()
+	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
 	if err == nil {
-		etVersion, err := strconv.ParseFloat(string(out), 64)
+		cmdOut := string(out)
+		cmdOut = strings.TrimSuffix(cmdOut, "\n")
+		etVersion, err := strconv.ParseFloat(cmdOut, 64)
 		check(err)
-		fmt.Println("ExifTool installed, version: ", etVersion)
+		fmt.Println("ExifTool installed. Version: ", etVersion)
+		exiftoolExist = true
 	} else {
+		check(err)
 		puts("ExifTool not found!")
-		puts("Are you want to processin only files who have TimeStamp in the name?")
+		puts("Will be processed only files who have TimeStamp in the name.")
+		exiftoolExist = false
+		// puts("Are you want to processing only files who have TimeStamp in the name?")
 	}
 	workDir := getConfig()
 	var et *exiftool.Exiftool
@@ -175,7 +181,9 @@ func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
 		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
 		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
-	dirFiles := make(map[string]processingAttr) //для хранения всего списка подходящих файлов, где: key- полный путь;
+	//для хранения списка подходящих файлов с датой в имени, где: key - полный путь;
+	dirFiles := make(map[string]processingAttr)
+	//для хранения списка подходящих файлов для exiftool, где: item - полный путь;
 	var forExifTool []string
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
