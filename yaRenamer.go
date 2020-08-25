@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -53,10 +54,20 @@ type processingAttr struct {
 	doByExiftool bool
 }
 
+var exiftoolExist bool
+
 func main() {
+	out, err := exec.Command("/usr/bin/env exiftool -ver").Output()
+	if err == nil {
+		etVersion, err := strconv.ParseFloat(string(out), 64)
+		check(err)
+		fmt.Println("ExifTool installed, version: ", etVersion)
+	} else {
+		puts("ExifTool not found!")
+		puts("Are you want to processin only files who have TimeStamp in the name?")
+	}
 	workDir := getConfig()
 	var et *exiftool.Exiftool
-	var err error
 	initEt := func() {
 		if et == nil {
 			et, err = exiftool.NewExiftool()
@@ -184,7 +195,7 @@ func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
 			check(err)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
 			if !fProcessing.toSkip {
-				if fProcessing.doByExiftool {
+				if fProcessing.doByExiftool && exiftoolExist {
 					forExifTool = append(forExifTool, path)
 				} else {
 					dirFiles[path] = fProcessing
