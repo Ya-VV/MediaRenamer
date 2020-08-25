@@ -168,15 +168,14 @@ func walkingOnFilesystem(workDir string) map[string]processingAttr {
 		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
 		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
-	subDirToSkip := "skip"
-	dirFiles := make(map[string]processingAttr) //для хранения всего списка подходящих файлов, где: key- полный путь; val- полное имя файла
+	dirFiles := make(map[string]processingAttr) //для хранения всего списка подходящих файлов, где: key- полный путь;
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
 			return err
 		}
-		if info.IsDir() && info.Name() == subDirToSkip {
+		if info.IsDir() && match(`^\..*`, info.Name()) {
 			fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
 			return filepath.SkipDir
 		}
@@ -198,30 +197,34 @@ func walkingOnFilesystem(workDir string) map[string]processingAttr {
 		fmt.Printf("error walking the path %q: %v\n", workDir, err)
 		log.Fatal(err)
 	}
-
 	return dirFiles
 }
 func fileToProcessing(file string) (processingAttr, error) {
 	var filematched processingAttr
+	fileNameBase := filepath.Base(file)
 	switch {
-	case match(patternToSkip, filepath.Base(file)):
+	case match(`^\..*`, fileNameBase):
 		puts(filepath.Base(file), "---> skip file")
 		filematched.toSkip = true
 		return filematched, nil
-	case match(patternDateInName, filepath.Base(file)):
+	case match(patternToSkip, fileNameBase):
+		puts(filepath.Base(file), "---> skip file")
+		filematched.toSkip = true
+		return filematched, nil
+	case match(patternDateInName, fileNameBase):
 		puts(filepath.Base(file), "---> pattern by inName")
 		filematched.doByName = true
 		return filematched, nil
-	case match(patternDateInName2, filepath.Base(file)):
+	case match(patternDateInName2, fileNameBase):
 		puts(filepath.Base(file), "---> pattern by inName")
 		filematched.doByName2 = true
 		return filematched, nil
-	case match(patternDateInName3, filepath.Base(file)):
+	case match(patternDateInName3, fileNameBase):
 		puts(filepath.Base(file), "---> pattern by inName")
 		filematched.doByName3 = true
 		return filematched, nil
 	default:
-		puts(filepath.Base(file), "---> pattern by doExif")
+		puts(fileNameBase, "---> pattern by doExif")
 		filematched.doByExiftool = true
 		return filematched, nil
 	}
