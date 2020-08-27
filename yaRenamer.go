@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -45,11 +46,6 @@ const (
 	stdNumColonTZ     = "-07:00" // always numeric
 )
 
-var patternToSkip = `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
-var patternDateInName = `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
-var patternDateInName2 = `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                         //шаблон файлов имеющих дату в имени
-var patternDateInName3 = `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}`   //шаблон файлов имеющих дату в имени
-
 type processingAttr struct {
 	toSkip       bool
 	doByName     bool
@@ -58,15 +54,26 @@ type processingAttr struct {
 	doByExiftool bool
 }
 
+var exiftoolExist bool
+
 func main() {
+	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
+	if err == nil {
+		cmdOut := string(out)
+		cmdOut = strings.TrimSuffix(cmdOut, "\n")
+		etVersion, err := strconv.ParseFloat(cmdOut, 64)
+		check(err)
+		fmt.Println("ExifTool installed. Version: ", etVersion)
+		exiftoolExist = true
+	} else {
+		check(err)
+		puts("ExifTool not found!")
+		puts("Will be processed only files who have TimeStamp in the name.")
+		exiftoolExist = false
+		// puts("Are you want to processing only files who have TimeStamp in the name?")
+	}
 	workDir := getConfig()
-	// log.Println("=== App started ===")
-	dirFiles := walkingOnFilesystem(workDir)
 	var et *exiftool.Exiftool
-	var err error
-	mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
-	mustCompile2 := regexp.MustCompile(`^(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{6})`)
-	mustCompile3 := regexp.MustCompile(`^.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})`)
 	initEt := func() {
 		if et == nil {
 			et, err = exiftool.NewExiftool()
@@ -75,48 +82,52 @@ func main() {
 			}
 		}
 	}
-	if len(dirFiles) > 0 {
-		initEt()
-		defer et.Close()
-	} else {
-		fmt.Println("Nothin to do!\nBye :)")
+	dirFiles, forExifTool := walkingOnFilesystem(workDir)
+	if len(dirFiles)+len(forExifTool) == 0 {
+		puts("Nothin to do!\nBye :)")
 		os.Exit(0)
 	}
-	for key, val := range dirFiles {
-		fmt.Println(key)
-		switch {
-		case val.doByName:
-			nameSlice := mustCompile1.FindStringSubmatch(filepath.Base(key))
-			newName := nameSlice[1] + "_" + nameSlice[2]
-			renamer(key, newName)
-		case val.doByName2:
-			nameSlice := mustCompile2.FindStringSubmatch(filepath.Base(key))
-			newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
-			renamer(key, newName)
-		case val.doByName3:
-			nameSlice := mustCompile3.FindStringSubmatch(filepath.Base(key))
-			newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
-			renamer(key, newName)
-		case val.doByExiftool:
-			exifData, err := getExif(et, key)
+	if len(dirFiles) > 0 {
+		mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
+		mustCompile2 := regexp.MustCompile(`^(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{6})`)
+		mustCompile3 := regexp.MustCompile(`^.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})`)
+		for key, val := range dirFiles {
+			switch {
+			case val.doByName:
+				nameSlice := mustCompile1.FindStringSubmatch(filepath.Base(key))
+				newName := nameSlice[1] + "_" + nameSlice[2]
+				renamer(key, newName)
+			case val.doByName2:
+				nameSlice := mustCompile2.FindStringSubmatch(filepath.Base(key))
+				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
+				renamer(key, newName)
+			case val.doByName3:
+				nameSlice := mustCompile3.FindStringSubmatch(filepath.Base(key))
+				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
+				renamer(key, newName)
+			default:
+				puts("Look like something wrong in main::for::switch block", key)
+			}
+		}
+	}
+	if len(forExifTool) > 0 {
+		initEt()
+		defer et.Close()
+		for _, item := range forExifTool {
+			exifData, err := getExif(et, item)
 			if err != nil { //если не получилось вынуть exif
-				fmt.Println("===> exifData: ", exifData)
-				fmt.Println("===> error: ", err)
-				log.Println("Exif data FAILED -> go to filesystem maketime data: ", key)
-				fInfo, err := os.Stat(key)
+				fInfo, err := os.Stat(item)
 				check(err)
 				fTimestamp := fInfo.ModTime()
 				newName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
-				renamer(key, newName)
+				renamer(item, newName)
 			} else {
 				newName := exifData.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
-				renamer(key, newName)
+				renamer(item, newName)
 			}
-		default:
-			puts("Look like something wrong in main::for::switch block", key)
 		}
 	}
-} //main END
+}
 func puts(s ...string) {
 	fmt.Println(s)
 }
@@ -125,7 +136,9 @@ func check(err error) {
 		log.Fatal(err)
 	}
 }
-func getConfig() string { //получаю каталог который необходимо обработать
+
+//Ask to workdir
+func getConfig() string {
 	var input string
 
 	if len(os.Args) == 2 {
@@ -146,8 +159,8 @@ func getConfig() string { //получаю каталог который нео�
 	}
 	return input
 }
-func walkingOnFilesystem(workDir string) map[string]processingAttr {
-	// fmt.Println("Walking on filesystem:")
+func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
+	// puts("Walking on filesystem:")
 	fileExt := []string{ //обрабатываемые файлы
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
 		".AIF", ".AIFC", ".APE", ".ARQ", ".ARW", ".ASF", ".AVI", ".AVIF", ".BMP", ".DIB", ".BPG", ".BTF", ".CHM", ".COS", ".CR2", ".CR3",
@@ -168,7 +181,10 @@ func walkingOnFilesystem(workDir string) map[string]processingAttr {
 		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
 		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
-	dirFiles := make(map[string]processingAttr) //для хранения всего списка подходящих файлов, где: key- полный путь;
+	//для хранения списка подходящих файлов с датой в имени, где: key - полный путь;
+	dirFiles := make(map[string]processingAttr)
+	//для хранения списка подходящих файлов для exiftool, где: item - полный путь;
+	var forExifTool []string
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -187,7 +203,11 @@ func walkingOnFilesystem(workDir string) map[string]processingAttr {
 			check(err)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
 			if !fProcessing.toSkip {
-				dirFiles[path] = fProcessing
+				if fProcessing.doByExiftool && exiftoolExist {
+					forExifTool = append(forExifTool, path)
+				} else {
+					dirFiles[path] = fProcessing
+				}
 			}
 		}
 		return nil
@@ -197,11 +217,15 @@ func walkingOnFilesystem(workDir string) map[string]processingAttr {
 		fmt.Printf("error walking the path %q: %v\n", workDir, err)
 		log.Fatal(err)
 	}
-	return dirFiles
+	return dirFiles, forExifTool
 }
 func fileToProcessing(file string) (processingAttr, error) {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
+	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
+	patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
+	patternDateInName2 := `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                         //шаблон файлов имеющих дату в имени
+	patternDateInName3 := `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}`   //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
 		puts(filepath.Base(file), "---> skip file")
