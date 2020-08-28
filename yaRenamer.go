@@ -57,31 +57,8 @@ type processingAttr struct {
 var exiftoolExist bool
 
 func main() {
-	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
-	if err == nil {
-		cmdOut := string(out)
-		cmdOut = strings.TrimSuffix(cmdOut, "\n")
-		etVersion, err := strconv.ParseFloat(cmdOut, 64)
-		check(err)
-		fmt.Println("ExifTool installed. Version: ", etVersion)
-		exiftoolExist = true
-	} else {
-		check(err)
-		puts("ExifTool not found!")
-		puts("Will be processed only files who have TimeStamp in the name.")
-		exiftoolExist = false
-		// puts("Are you want to processing only files who have TimeStamp in the name?")
-	}
+	checkEt()
 	workDir := getConfig()
-	var et *exiftool.Exiftool
-	initEt := func() {
-		if et == nil {
-			et, err = exiftool.NewExiftool()
-			if err != nil {
-				panic(fmt.Errorf("Error when intializing: %v", err))
-			}
-		}
-	}
 	dirFiles, forExifTool := walkingOnFilesystem(workDir)
 	if len(dirFiles)+len(forExifTool) == 0 {
 		puts("Nothin to do!\nBye :)")
@@ -110,8 +87,11 @@ func main() {
 			}
 		}
 	}
-	if len(forExifTool) > 0 {
-		initEt()
+	if len(forExifTool) > 0 && exiftoolExist {
+		et, err := exiftool.NewExiftool()
+		if err != nil {
+			panic(fmt.Errorf("Error when intializing: %v", err))
+		}
 		defer et.Close()
 		for _, item := range forExifTool {
 			exifData, err := getExif(et, item)
@@ -134,6 +114,23 @@ func puts(s ...string) {
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+func checkEt() {
+	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
+	if err == nil {
+		cmdOut := string(out)
+		cmdOut = strings.TrimSuffix(cmdOut, "\n")
+		etVersion, err := strconv.ParseFloat(cmdOut, 64)
+		check(err)
+		fmt.Println("ExifTool installed. Version: ", etVersion)
+		exiftoolExist = true
+	} else {
+		check(err)
+		puts("ExifTool not found!")
+		puts("Will be processed only files who have TimeStamp in the name.")
+		exiftoolExist = false
+		// puts("Are you want to processing only files who have TimeStamp in the name?")
 	}
 }
 
