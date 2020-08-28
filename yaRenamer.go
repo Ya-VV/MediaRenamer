@@ -66,7 +66,7 @@ func main() {
 	}
 	if len(dirFiles) > 0 {
 		mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
-		mustCompile2 := regexp.MustCompile(`^(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{6})`)
+		mustCompile2 := regexp.MustCompile(`^.*(\d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-](\d{6})`)
 		mustCompile3 := regexp.MustCompile(`^.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})`)
 		for key, val := range dirFiles {
 			switch {
@@ -221,7 +221,7 @@ func fileToProcessing(file string) (processingAttr, error) {
 	fileNameBase := filepath.Base(file)
 	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
 	patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
-	patternDateInName2 := `^\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{6}`                         //шаблон файлов имеющих дату в имени
+	patternDateInName2 := `^.*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]\d{6}`                     //шаблон файлов имеющих дату в имени
 	patternDateInName3 := `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}`   //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
