@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -57,11 +58,22 @@ type processingAttr struct {
 var exiftoolExist bool
 
 func main() {
-	checkEt()
-	workDir := getConfig()
-	dirFiles, forExifTool := walkingOnFilesystem(workDir)
+	timeNow := time.Now()
+	logFile, err := os.OpenFile(timeNow.Format("20060102150405")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	mw := io.MultiWriter(os.Stdout, logFile)
+	logger := log.New(mw, "INFO: ", log.Flags()&^(log.Ldate|log.Ltime))
+	defer logFile.Close()
+
+	logger.Println("yaRenamer started!")
+
+	checkEt(logger)
+	workDir := getConfig(logger)
+	dirFiles, forExifTool := walkingOnFilesystem(workDir, logger)
 	if len(dirFiles)+len(forExifTool) == 0 {
-		puts("Nothin to do!\nBye :)")
+		logger.Println("Nothin to do!\nBye :)")
 		os.Exit(0)
 	}
 	if len(dirFiles) > 0 {
@@ -69,21 +81,25 @@ func main() {
 		mustCompile2 := regexp.MustCompile(`^.*(\d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-](\d{6})`)
 		mustCompile3 := regexp.MustCompile(`^.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})[_:-](\d{2})`)
 		for key, val := range dirFiles {
+			logger.SetPrefix(filepath.Base(key) + " ")
 			switch {
 			case val.doByName:
 				nameSlice := mustCompile1.FindStringSubmatch(filepath.Base(key))
 				newName := nameSlice[1] + "_" + nameSlice[2]
-				renamer(key, newName)
+				renamer(key, newName, logger)
+				logger.Println("New name is a: " + newName + "of file:" + key)
 			case val.doByName2:
 				nameSlice := mustCompile2.FindStringSubmatch(filepath.Base(key))
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
-				renamer(key, newName)
+				renamer(key, newName, logger)
+				logger.Println("New name is a: " + newName + "of file:" + key)
 			case val.doByName3:
 				nameSlice := mustCompile3.FindStringSubmatch(filepath.Base(key))
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
-				renamer(key, newName)
+				renamer(key, newName, logger)
+				logger.Println("New name is a: " + newName + "of file:" + key)
 			default:
-				puts("Look like something wrong in main::for::switch block", key)
+				logger.Println("Look like something wrong in main::for::switch block ", key)
 			}
 		}
 	}
@@ -94,16 +110,20 @@ func main() {
 		}
 		defer et.Close()
 		for _, item := range forExifTool {
-			exifData, err := getExif(et, item)
+			logger.SetPrefix(filepath.Base(item) + " ")
+			exifData, err := getExif(et, item, logger)
 			if err != nil { //если не получилось вынуть exif
+				logger.Println("func:fsTimeStamp; when exif data corrupted")
 				fInfo, err := os.Stat(item)
 				check(err)
 				fTimestamp := fInfo.ModTime()
 				newName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
-				renamer(item, newName)
+				renamer(item, newName, logger)
+				logger.Println("main:fsTimeStamp:rename; newName: " + newName)
 			} else {
 				newName := exifData.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
-				renamer(item, newName)
+				renamer(item, newName, logger)
+				logger.Println("main:exifToolRename; newName: " + newName)
 			}
 		}
 	}
@@ -116,26 +136,24 @@ func check(err error) {
 		log.Fatal(err)
 	}
 }
-func checkEt() {
+func checkEt(logger *log.Logger) {
 	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
 	if err == nil {
 		cmdOut := string(out)
 		cmdOut = strings.TrimSuffix(cmdOut, "\n")
 		etVersion, err := strconv.ParseFloat(cmdOut, 64)
 		check(err)
-		fmt.Println("ExifTool installed. Version: ", etVersion)
+		logger.Println("ExifTool installed. Version: ", etVersion)
 		exiftoolExist = true
 	} else {
-		check(err)
-		puts("ExifTool not found!")
-		puts("Will be processed only files who have TimeStamp in the name.")
+		logger.Println("ExifTool not found!")
+		logger.Println("Will be processed only files who have TimeStamp in the name.")
 		exiftoolExist = false
-		// puts("Are you want to processing only files who have TimeStamp in the name?")
 	}
 }
 
 //Ask to workdir
-func getConfig() string {
+func getConfig(logger *log.Logger) string {
 	var input string
 
 	if len(os.Args) == 2 {
@@ -152,11 +170,11 @@ func getConfig() string {
 		if !checkPath(input) {
 			log.Fatal("Dir is not exist")
 		}
-		fmt.Printf("Your choise is a: %v\n", input)
+		logger.Printf("Your choise is a: %v\n", input)
 	}
 	return input
 }
-func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
+func walkingOnFilesystem(workDir string, logger *log.Logger) (map[string]processingAttr, []string) {
 	// puts("Walking on filesystem:")
 	fileExt := []string{ //обрабатываемые файлы
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
@@ -185,18 +203,18 @@ func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			logger.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
 			return err
 		}
 		if info.IsDir() && match(`^\..*`, info.Name()) {
-			fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
+			logger.Printf("skipping a dir without errors: %+v \n", info.Name())
 			return filepath.SkipDir
 		}
 		// fmt.Printf("visited file or dir: %q\n", path)
 
 		//проверка на подходящее расширение файла (в нижнем регистре) со слайса fileExt + признак по которому обрабатывать
 		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
-			fProcessing, err := fileToProcessing(path)
+			fProcessing, err := fileToProcessing(path, logger)
 			check(err)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
 			if !fProcessing.toSkip {
@@ -211,41 +229,44 @@ func walkingOnFilesystem(workDir string) (map[string]processingAttr, []string) {
 	})
 
 	if err != nil {
-		fmt.Printf("error walking the path %q: %v\n", workDir, err)
+		logger.Printf("error walking the path %q: %v\n", workDir, err)
 		log.Fatal(err)
 	}
+	logger.Println("Found " + strconv.Itoa(len(dirFiles)) + " files for processing without exiftool")
+	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
 	return dirFiles, forExifTool
 }
-func fileToProcessing(file string) (processingAttr, error) {
+func fileToProcessing(file string, logger *log.Logger) (processingAttr, error) {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
+	logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
 	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)|(^\d{8}_\d{6}_\(\d+\)\.)` //шаблон файлов обработанных раннее
 	patternDateInName := `^[A-Z]{3}_\d{8}_\d{6}`                                         //шаблон файлов имеющих дату в имени
 	patternDateInName2 := `^.*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]\d{6}`                     //шаблон файлов имеющих дату в имени
 	patternDateInName3 := `^.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}[_:-]\d{2}`   //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
-		puts(filepath.Base(file), "---> skip file")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
 		filematched.toSkip = true
 		return filematched, nil
 	case match(patternToSkip, fileNameBase):
-		puts(filepath.Base(file), "---> skip file")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
 		filematched.toSkip = true
 		return filematched, nil
 	case match(patternDateInName, fileNameBase):
-		puts(filepath.Base(file), "---> pattern by inName")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
 		filematched.doByName = true
 		return filematched, nil
 	case match(patternDateInName2, fileNameBase):
-		puts(filepath.Base(file), "---> pattern by inName")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
 		filematched.doByName2 = true
 		return filematched, nil
 	case match(patternDateInName3, fileNameBase):
-		puts(filepath.Base(file), "---> pattern by inName")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
 		filematched.doByName3 = true
 		return filematched, nil
 	default:
-		puts(fileNameBase, "---> pattern by doExif")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")
 		filematched.doByExiftool = true
 		return filematched, nil
 	}
@@ -277,32 +298,30 @@ func match(pattern string, text string) bool {
 	check(err)
 	return m
 }
-func renamer(fullPath string, newName string) {
-	puts("====================================================================================================")
-	puts("fullpath: ", fullPath)
-	puts("newname ---> ", newName)
+func renamer(fullPath string, newName string, logger *log.Logger) {
+	logger.Println("renamer:start, newName: " + newName)
 	path := filepath.Dir(fullPath) + "/"
 	extFile := filepath.Ext(fullPath)
 	fullNewName := path + newName + extFile
+	logger.Println("renamer:newFullName: " + fullNewName)
 	if fileExists(fullNewName) {
 		nextName := newName
+		logger.Println("renamer:fileExists, newName: " + newName)
 		for count := 1; fileExists(path + nextName + extFile); count++ {
 			nextName = newName + "(" + strconv.Itoa(count) + ")"
 		}
 		fullNewName = path + nextName + extFile
-		puts("New newName: ", fullNewName)
+		logger.Println("renamer:fileExists, newFullName: " + fullNewName)
 	}
 
 	err := os.Rename(fullPath, fullNewName)
 	check(err)
 }
-func getExif(et *exiftool.Exiftool, filePath string) (time.Time, error) {
-	fname := filePath
-
-	fileInfos := et.ExtractMetadata(fname)
+func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (time.Time, error) {
+	fileInfos := et.ExtractMetadata(filePath)
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
-			fmt.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
+			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
 			continue
 		}
 		if verbose {
@@ -319,19 +338,19 @@ func getExif(et *exiftool.Exiftool, filePath string) (time.Time, error) {
 		// [FileModifyDate] 	2019:01:14 11:08:20+02:00
 		tLayout3 := "2006:01:02 15:04:05-07:00"
 		if exifTime, err := fileInfo.GetString("CreateDate"); err == nil {
-			puts("Exif field <<<CreateDate>>> matched")
+			logger.Println("getExif:checkField; Exif field <<<CreateDate>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("DateTimeOriginal"); err == nil {
-			puts("Exif field <<<DateTimeOriginal>>> matched")
+			logger.Println("getExif:checkField; Exif field <<<DateTimeOriginal>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("Date"); err == nil {
-			puts("Exif field <<<Date>>> matched")
+			logger.Println("getExif:checkField; Exif field <<<Date>>> matched")
 			return parseExifTime(tLayout2, exifTime)
 		} else if exifTime, err := fileInfo.GetString("ModifyDate"); err == nil {
-			puts("Exif field <<<ModifyDate>>> matched")
+			logger.Println("getExif:checkField; Exif field <<<ModifyDate>>> matched")
 			return parseExifTime(tLayout1, exifTime)
 		} else if exifTime, err := fileInfo.GetString("FileModifyDate"); err == nil {
-			puts("Exif field <<<FileModifyDate>>> matched")
+			logger.Println("getExif:checkField; Exif field <<<FileModifyDate>>> matched")
 			return parseExifTime(tLayout3, exifTime)
 		}
 	}
