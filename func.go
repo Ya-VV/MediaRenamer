@@ -287,3 +287,12 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (time.T
 func parseExifTime(layout string, it string) (time.Time, error) {
 	return time.Parse(layout, it)
 }
+func fsTimeStamp(item string) (string, error) {
+	fInfo, err := os.Stat(item)
+	if err != nil {
+		return "", nil
+	}
+	fTimestamp := fInfo.ModTime()
+	fModTimeNewName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
+	return fModTimeNewName, nil
+}

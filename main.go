@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/barasher/go-exiftool"
@@ -46,12 +47,26 @@ func main() {
 				logger.Println("New name is a: " + newName + "of file:" + key)
 			case val.doByName2:
 				nameSlice := mustCompile2.FindStringSubmatch(filepath.Base(key))
+				parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
+				check(err)
+				if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1985 {
+					logger.Println("Failed when parsed fileYear: ", parsedFileYear, "moved to exifRenamer func")
+					forExifTool = append(forExifTool, key)
+					continue
+				}
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
 				renamer(key, newName, logger)
 				logger.Println("New name is a: " + newName + "of file:" + key)
 			case val.doByName3:
 				nameSlice := mustCompile3.FindStringSubmatch(filepath.Base(key))
 				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
+				parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
+				check(err)
+				if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1985 {
+					logger.Println("Failed when parsed fileYear: ", parsedFileYear, "moved to exifRenamer func")
+					forExifTool = append(forExifTool, key)
+					continue
+				}
 				renamer(key, newName, logger)
 				logger.Println("New name is a: " + newName + "of file:" + key)
 			default:
@@ -70,16 +85,24 @@ func main() {
 			exifData, err := getExif(et, item, logger)
 			if err != nil { //если не получилось вынуть exif
 				logger.Println("func:fsTimeStamp; when exif data corrupted")
-				fInfo, err := os.Stat(item)
+				newName, err := fsTimeStamp(item)
 				check(err)
-				fTimestamp := fInfo.ModTime()
-				newName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
 				renamer(item, newName, logger)
 				logger.Println("main:fsTimeStamp:rename; newName: " + newName)
 			} else {
-				newName := exifData.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
-				renamer(item, newName, logger)
-				logger.Println("main:exifToolRename; newName: " + newName)
+				etYear, err := strconv.ParseInt(stdLongYear, 10, 32)
+				check(err)
+				if etYear > int64(timeNow.Year()) || etYear < 1985 {
+					logger.Println("func:fsTimeStamp; when exif data falsified: ", stdLongYear)
+					newName, err := fsTimeStamp(item)
+					check(err)
+					renamer(item, newName, logger)
+					logger.Println("main:fsTimeStamp:rename; newName: " + newName)
+				} else {
+					newName := exifData.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
+					renamer(item, newName, logger)
+					logger.Println("main:exifToolRename; newName: " + newName)
+				}
 			}
 		}
 	}
