@@ -34,7 +34,7 @@ func main() {
 	}
 	if len(dirFiles) > 0 {
 		// mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
-		mustCompile1 := regexp.MustCompile(`.*(\d{8})_(\d{6})`)
+		mustCompile1 := regexp.MustCompile(`.*(\d{8})[_:-]?(\d{6})`)
 		mustCompile2 := regexp.MustCompile(`.*(\d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-]?\s?(\d{6})`)
 		mustCompile3 := regexp.MustCompile(`.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-]?\s?(\d{2})[_:-](\d{2})[_:-](\d{2})`)
 		for key, val := range dirFiles {
