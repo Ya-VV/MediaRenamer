@@ -33,7 +33,7 @@ func main() {
 		os.Exit(0)
 	}
 	if len(dirFiles) > 0 {
-		mustCompile := regexp.MustCompile(`.*\(d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-]?\s?(\d{2})[_:-]?(\d{2})[_:-]?(\d{2})`)
+		mustCompile := regexp.MustCompile(`.*(\d{4})[\._:-]?(\d{2})[\._:-]?(\d{2})[\._:-]?\s?(\d{2})[\._:-]?(\d{2})[\._:-]?(\d{2}).*`)
 		for _, item := range dirFiles {
 			logger.SetPrefix(filepath.Base(item) + " ")
 			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))

@@ -166,8 +166,8 @@ func fileToProcessing(file string, logger *log.Logger) (processingAttr, error) {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
 	logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
-	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                              //|(^\d{8}_\d{6}_\(\d+\)\.) шаблон файлов обработанных раннее
-	patternDateInName := `.*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]?\s?\d{2}[_:-]?\d{2}[_:-]?\d{2}` //шаблон файлов имеющих дату в имени
+	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                                        //|(^\d{8}_\d{6}_\(\d+\)\.) шаблон файлов обработанных раннее
+	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}[\._:-]?\s?\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
 		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
