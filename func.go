@@ -49,8 +49,6 @@ const (
 type processingAttr struct {
 	toSkip       bool
 	doByName     bool
-	doByName2    bool
-	doByName3    bool
 	doByExiftool bool
 }
 
@@ -102,8 +100,7 @@ func getConfig(logger *log.Logger) string {
 	}
 	return input
 }
-func walkingOnFilesystem(workDir string, logger *log.Logger) (map[string]processingAttr, []string) {
-	// puts("Walking on filesystem:")
+func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
 	fileExt := []string{ //обрабатываемые файлы
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
 		".AIF", ".AIFC", ".APE", ".ARQ", ".ARW", ".ASF", ".AVI", ".AVIF", ".BMP", ".DIB", ".BPG", ".BTF", ".CHM", ".COS", ".CR2", ".CR3",
@@ -124,9 +121,9 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) (map[string]process
 		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
 		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
-	//для хранения списка подходящих файлов с датой в имени, где: key - полный путь;
-	dirFiles := make(map[string]processingAttr)
-	//для хранения списка подходящих файлов для exiftool, где: item - полный путь;
+	//для хранения списка подходящих файлов с датой в имени, где каждый item - полный путь;
+	var dirFiles []string
+	//для хранения списка подходящих файлов для exiftool, где каждый item - полный путь;
 	var forExifTool []string
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
@@ -149,7 +146,8 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) (map[string]process
 				if fProcessing.doByExiftool && exiftoolExist {
 					forExifTool = append(forExifTool, path)
 				} else {
-					dirFiles[path] = fProcessing
+					//исправить - т.к. свалится если в имени нет даты
+					dirFiles = append(dirFiles, path)
 				}
 			}
 		}
@@ -168,11 +166,8 @@ func fileToProcessing(file string, logger *log.Logger) (processingAttr, error) {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
 	logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
-	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                           //|(^\d{8}_\d{6}_\(\d+\)\.) шаблон файлов обработанных раннее
-	patternDateInName := `.*\d{8}[_:-]?\d{6}`                                             //шаблон файлов имеющих дату в имени
-	patternDateInName2 := `.*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]?\s?\d{6}`                   //шаблон файлов имеющих дату в имени
-	patternDateInName3 := `.*\d{4}[_:-]\d{2}[_:-]\d{2}[_:-]?\s?\d{2}[_:-]\d{2}[_:-]\d{2}` //шаблон файлов имеющих дату в имени
-	//!!!!!!!нужен регексп только .*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]?\s?\d{2}[_:-]?\d{2}[_:-]?\d{2}
+	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                              //|(^\d{8}_\d{6}_\(\d+\)\.) шаблон файлов обработанных раннее
+	patternDateInName := `.*\d{4}[_:-]?\d{2}[_:-]?\d{2}[_:-]?\s?\d{2}[_:-]?\d{2}[_:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
 		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
@@ -183,16 +178,8 @@ func fileToProcessing(file string, logger *log.Logger) (processingAttr, error) {
 		filematched.toSkip = true
 		return filematched, nil
 	case match(patternDateInName, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
+		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by DateInName")
 		filematched.doByName = true
-		return filematched, nil
-	case match(patternDateInName2, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
-		filematched.doByName2 = true
-		return filematched, nil
-	case match(patternDateInName3, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by inName")
-		filematched.doByName3 = true
 		return filematched, nil
 	default:
 		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")

@@ -33,45 +33,20 @@ func main() {
 		os.Exit(0)
 	}
 	if len(dirFiles) > 0 {
-		// mustCompile1 := regexp.MustCompile(`^[A-Z]{3}_(\d{8})_(\d{6})`)
-		mustCompile1 := regexp.MustCompile(`.*(\d{8})[_:-]?(\d{6})`)
-		mustCompile2 := regexp.MustCompile(`.*(\d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-]?\s?(\d{6})`)
-		mustCompile3 := regexp.MustCompile(`.*(\d{4})[_:-](\d{2})[_:-](\d{2})[_:-]?\s?(\d{2})[_:-](\d{2})[_:-](\d{2})`)
-		for key, val := range dirFiles {
-			logger.SetPrefix(filepath.Base(key) + " ")
-			switch {
-			case val.doByName:
-				nameSlice := mustCompile1.FindStringSubmatch(filepath.Base(key))
-				newName := nameSlice[1] + "_" + nameSlice[2]
-				renamer(key, newName, logger)
-				logger.Println("New name is a: " + newName + "of file:" + key)
-			case val.doByName2:
-				nameSlice := mustCompile2.FindStringSubmatch(filepath.Base(key))
-				parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
-				check(err)
-				if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1985 {
-					logger.Println("Failed when parsed fileYear: ", parsedFileYear, "moved to exifRenamer func")
-					forExifTool = append(forExifTool, key)
-					continue
-				}
-				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4]
-				renamer(key, newName, logger)
-				logger.Println("New name is a: " + newName + "of file:" + key)
-			case val.doByName3:
-				nameSlice := mustCompile3.FindStringSubmatch(filepath.Base(key))
-				newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
-				parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
-				check(err)
-				if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1985 {
-					logger.Println("Failed when parsed fileYear: ", parsedFileYear, "moved to exifRenamer func")
-					forExifTool = append(forExifTool, key)
-					continue
-				}
-				renamer(key, newName, logger)
-				logger.Println("New name is a: " + newName + "of file:" + key)
-			default:
-				logger.Println("Look like something wrong in main::for::switch block ", key)
+		mustCompile := regexp.MustCompile(`.*\(d{4})[_:-]?(\d{2})[_:-]?(\d{2})[_:-]?\s?(\d{2})[_:-]?(\d{2})[_:-]?(\d{2})`)
+		for _, item := range dirFiles {
+			logger.SetPrefix(filepath.Base(item) + " ")
+			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))
+			parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
+			check(err)
+			if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1995 {
+				logger.Println("Failed when parsed fileYear: ", parsedFileYear, "moved to exifRenamer func")
+				forExifTool = append(forExifTool, item)
+				continue
 			}
+			newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
+			renamer(item, newName, logger)
+			logger.Println("New name is a: " + newName + "of file:" + item)
 		}
 	}
 	if len(forExifTool) > 0 && exiftoolExist {
