@@ -37,6 +37,10 @@ func main() {
 		for _, item := range dirFiles {
 			logger.SetPrefix(filepath.Base(item) + " ")
 			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))
+			if len(nameSlice) == 0 {
+				logger.Println("doing func:fsTimeStamp; when DateInName data corrupted")
+				useFSTimeStamp(item, logger)
+			}
 			parsedFileYear, err := strconv.ParseInt(nameSlice[1], 10, 32)
 			check(err)
 			if parsedFileYear > int64(timeNow.Year()) || parsedFileYear < 1995 {
@@ -67,12 +71,9 @@ func main() {
 			} else {
 				etYear, err := strconv.ParseInt(stdLongYear, 10, 32)
 				check(err)
-				if etYear > int64(timeNow.Year()) || etYear < 1985 {
+				if etYear > int64(timeNow.Year()) || etYear < 1995 {
 					logger.Println("func:fsTimeStamp; when exif data falsified: ", stdLongYear)
-					newName, err := fsTimeStamp(item)
-					check(err)
-					renamer(item, newName, logger)
-					logger.Println("main:fsTimeStamp:rename; newName: " + newName)
+					useFSTimeStamp(item, logger)
 				} else {
 					newName := exifData.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
 					renamer(item, newName, logger)

@@ -146,7 +146,6 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 				if fProcessing.doByExiftool && exiftoolExist {
 					forExifTool = append(forExifTool, path)
 				} else {
-					//исправить - т.к. свалится если в имени нет даты
 					dirFiles = append(dirFiles, path)
 				}
 			}
@@ -283,4 +282,10 @@ func fsTimeStamp(item string) (string, error) {
 	fTimestamp := fInfo.ModTime()
 	fModTimeNewName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
 	return fModTimeNewName, nil
+}
+func useFSTimeStamp(fPath string, logger *log.Logger) {
+	newName, err := fsTimeStamp(fPath)
+	check(err)
+	logger.Println("fsTimeStamp:rename; newName: " + newName)
+	renamer(fPath, newName, logger)
 }
