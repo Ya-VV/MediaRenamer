@@ -8,13 +8,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"time"
 
 	"github.com/barasher/go-exiftool"
 )
 
 func main() {
-	timeNow := time.Now()
 	logFile, err := os.OpenFile(timeNow.Format("20060102150405")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println(err)
@@ -63,12 +61,13 @@ func main() {
 			logger.SetPrefix(filepath.Base(item) + " ")
 			exifData, err := getExif(et, item, logger)
 			if err != nil { //if getExif data is failed
-				logger.Println("func:fsTimeStamp; when exif data corrupted")
+				logger.Println(err)
+				logger.Println("func:fsTimeStamp; when exif data corrupted.")
 				useFSTimeStamp(item, logger)
 			} else {
-				etYear, err := strconv.ParseInt(stdLongYear, 10, 32)
-				check(err)
-				if etYear > int64(timeNow.Year()) || etYear < 1995 {
+				//etYear, err := strconv.ParseInt(stdLongYear, 10, 32) ////!!!!!!!!!!stdLo
+				//check(err)
+				if int64(exifData.Year()) > int64(timeNow.Year()) || int64(exifData.Year()) < 1995 {
 					logger.Println("func:fsTimeStamp; when exif data falsified: ", stdLongYear)
 					useFSTimeStamp(item, logger)
 				} else {
@@ -79,6 +78,8 @@ func main() {
 			}
 		}
 	} else {
-		logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing")
+		if !exiftoolExist {
+			logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing")
+		}
 	}
 }

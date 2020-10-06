@@ -53,6 +53,7 @@ type processingAttr struct {
 }
 
 var exiftoolExist bool
+var timeNow = time.Now()
 
 func puts(s ...string) {
 	fmt.Println(s)
@@ -245,29 +246,19 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (time.T
 				fmt.Printf("[%v] %v\n", k, v)
 			}
 		}
-		// [CreateDate] 		2008:06:18 22:02:45
-		// [DateTimeOriginal] 	2008:06:18 22:02:45
-		// [ModifyDate] 		2008:06:18 22:02:45
-		tLayout1 := "2006:01:02 15:04:05"
-		// [Date] 				2020:03:02 12:57:46.145865+02:00
-		tLayout2 := "2006:01:02 15:04:05.999999-07:00"
-		// [FileModifyDate] 	2019:01:14 11:08:20+02:00
-		tLayout3 := "2006:01:02 15:04:05-07:00"
-		if exifTime, err := fileInfo.GetString("CreateDate"); err == nil {
-			logger.Println("getExif:checkField; Exif field <<<CreateDate>>> matched")
-			return parseExifTime(tLayout1, exifTime)
-		} else if exifTime, err := fileInfo.GetString("DateTimeOriginal"); err == nil {
-			logger.Println("getExif:checkField; Exif field <<<DateTimeOriginal>>> matched")
-			return parseExifTime(tLayout1, exifTime)
-		} else if exifTime, err := fileInfo.GetString("Date"); err == nil {
-			logger.Println("getExif:checkField; Exif field <<<Date>>> matched")
-			return parseExifTime(tLayout2, exifTime)
-		} else if exifTime, err := fileInfo.GetString("ModifyDate"); err == nil {
-			logger.Println("getExif:checkField; Exif field <<<ModifyDate>>> matched")
-			return parseExifTime(tLayout1, exifTime)
-		} else if exifTime, err := fileInfo.GetString("FileModifyDate"); err == nil {
-			logger.Println("getExif:checkField; Exif field <<<FileModifyDate>>> matched")
-			return parseExifTime(tLayout3, exifTime)
+		tLayout := "\\d{4}[\\._:-]?\\d{2}[\\._:-]?\\d{2}[\\._:-]?\\s?\\d{2}[\\._:-]?\\d{2}[\\._:-]?\\d{2}"
+		fileExifStrings := []string{"CreateDate", "DateTimeOriginal", "ModifyDate", "Date", "FileModifyDate", "File Modification Date/Time"}
+		for _, exifString := range fileExifStrings {
+			if exifTime, err := fileInfo.GetString(exifString); err == nil {
+				logger.Printf("getExif:checkField; Exif field <<<%v>>> matched", exifString)
+				exifDateParsed, err := parseExifTime(tLayout, exifTime)
+				check(err)
+				if err := areYearActual(exifDateParsed, logger); err != nil {
+					logger.Printf("ERROR: exif data (file year) corrupted: %v\n", exifDateParsed.Year())
+					continue
+				}
+				return exifDateParsed, nil
+			}
 		}
 	}
 	return time.Time{}, errors.New("ERROR: exif data corrupted")
@@ -289,4 +280,12 @@ func useFSTimeStamp(fPath string, logger *log.Logger) {
 	check(err)
 	logger.Println("fsTimeStamp:rename; newName: " + newName)
 	renamer(fPath, newName, logger)
+}
+func areYearActual(eTime time.Time, logger *log.Logger) (err error) {
+	if int64(eTime.Year()) > int64(timeNow.Year()) || int64(eTime.Year()) < 1995 {
+		logger.Printf("Parsed year is corrupted: %v", eTime.Year())
+		return errors.New("Parsed year is corrupted")
+	}
+	err = nil
+	return err
 }
