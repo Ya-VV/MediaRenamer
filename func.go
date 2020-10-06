@@ -101,7 +101,8 @@ func getConfig(logger *log.Logger) string {
 	return input
 }
 func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
-	fileExt := []string{ //обрабатываемые файлы
+	//fileExt: array fo file extensions to processing
+	fileExt := []string{
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
 		".AIF", ".AIFC", ".APE", ".ARQ", ".ARW", ".ASF", ".AVI", ".AVIF", ".BMP", ".DIB", ".BPG", ".BTF", ".CHM", ".COS", ".CR2", ".CR3",
 		".CRW", ".CIFF", ".CS1", ".CSV", ".DCM", ".DC3", ".DIC", ".DICM", ".DCP", ".DCR", ".DFONT", ".DIVX", ".DJVU", ".DJV", ".DNG",

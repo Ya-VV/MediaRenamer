@@ -62,12 +62,9 @@ func main() {
 		for _, item := range forExifTool {
 			logger.SetPrefix(filepath.Base(item) + " ")
 			exifData, err := getExif(et, item, logger)
-			if err != nil { //если не получилось вынуть exif
+			if err != nil { //if getExif data is failed
 				logger.Println("func:fsTimeStamp; when exif data corrupted")
-				newName, err := fsTimeStamp(item)
-				check(err)
-				renamer(item, newName, logger)
-				logger.Println("main:fsTimeStamp:rename; newName: " + newName)
+				useFSTimeStamp(item, logger)
 			} else {
 				etYear, err := strconv.ParseInt(stdLongYear, 10, 32)
 				check(err)
@@ -81,5 +78,7 @@ func main() {
 				}
 			}
 		}
+	} else {
+		logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing")
 	}
 }
