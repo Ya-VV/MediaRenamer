@@ -26,7 +26,8 @@ func LetsGo() {
 	checkEt(logger)
 	workDir = checkWorkDir(logger)
 	dirFiles, forExifTool := walkingOnFilesystem(workDir, logger)
-	if len(dirFiles)+len(forExifTool) == 0 {
+	totalFiles := len(dirFiles) + len(forExifTool)
+	if totalFiles == 0 {
 		logger.Println("Nothin to do!\nBye :)")
 		os.Exit(0)
 	}
@@ -74,4 +75,6 @@ func LetsGo() {
 			logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing")
 		}
 	}
+	logger.SetPrefix("INFO: ")
+	logger.Println("Total files processed: ", totalFiles)
 }

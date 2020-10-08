@@ -65,8 +65,10 @@ func SetWorkDir(s string, err error) {
 
 //SetVerbose to assign verbose output
 func SetVerbose(vValue bool) {
-	verbose = vValue
-	fmt.Printf("Setted verbose flag: %v\n", vValue)
+	if vValue {
+		verbose = vValue
+		fmt.Printf("Setted verbose flag: %v\n", vValue)
+	}
 }
 func puts(s ...string) {
 	fmt.Println(s)
