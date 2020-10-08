@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"bufio"
@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	verbose           = false
 	stdLongMonth      = "January"
 	stdMonth          = "Jan"
 	stdNumMonth       = "1"
@@ -55,7 +54,20 @@ type processingAttr struct {
 var exiftoolExist bool
 var timeNow = time.Now()
 var exifBirthday int64 = 2002
+var verbose bool
+var workDir string
 
+//SetWorkDir set work directory from arguments
+func SetWorkDir(s string, err error) {
+	check(err)
+	workDir = s
+}
+
+//SetVerbose to assign verbose output
+func SetVerbose(vValue bool) {
+	verbose = vValue
+	fmt.Printf("Setted verbose flag: %v\n", vValue)
+}
 func puts(s ...string) {
 	fmt.Println(s)
 }
@@ -80,13 +92,10 @@ func checkEt(logger *log.Logger) {
 	}
 }
 
-//Ask to workdir
-func getConfig(logger *log.Logger) string {
-	var input string
-
-	if len(os.Args) == 2 {
-		input = os.Args[1]
-		if !checkPath(input) {
+//Check or ask workdir
+func checkWorkDir(logger *log.Logger) string {
+	if workDir != "" {
+		if !checkPath(workDir) {
 			log.Fatal("Dir is not exist")
 		}
 	} else {
@@ -94,13 +103,13 @@ func getConfig(logger *log.Logger) string {
 		reader := bufio.NewReader(os.Stdin)
 		inputData, err := reader.ReadString('\n')
 		check(err)
-		input = strings.TrimSpace(inputData)
-		if !checkPath(input) {
+		workDir = strings.TrimSpace(inputData)
+		if !checkPath(workDir) {
 			log.Fatal("Dir is not exist")
 		}
-		logger.Printf("Your choise is a: %v\n", input)
+		logger.Printf("Your choise is a: %v\n", workDir)
 	}
-	return input
+	return workDir
 }
 func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
 	//fileExt: array fo file extensions to processing
