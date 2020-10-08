@@ -2,8 +2,10 @@ package pkg
 
 import (
 	"bufio"
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -51,11 +53,19 @@ type processingAttr struct {
 	doByExiftool bool
 }
 
-var exiftoolExist bool
+var exiftoolExist, verbose, checkDublesFlag bool
 var timeNow = time.Now()
 var exifBirthday int64 = 2002
-var verbose bool
 var workDir string
+var allFiles = make(map[string]string)
+
+//SetCheckDublesFlag set to check dubles  from arguments
+func SetCheckDublesFlag(v bool) {
+	if v {
+		checkDublesFlag = v
+		fmt.Printf("Setted checkDublesFlag to: %v\n", v)
+	}
+}
 
 //SetWorkDir set work directory from arguments
 func SetWorkDir(s string, err error) {
@@ -63,11 +73,31 @@ func SetWorkDir(s string, err error) {
 	workDir = s
 }
 
+//Check or ask workdir
+func checkWorkDir(logger *log.Logger) string {
+	if workDir != "" {
+		if !checkPath(workDir) {
+			log.Fatal("Dir is not exist")
+		}
+	} else {
+		fmt.Print("Put collection path: ")
+		reader := bufio.NewReader(os.Stdin)
+		inputData, err := reader.ReadString('\n')
+		check(err)
+		workDir = strings.TrimSpace(inputData)
+		if !checkPath(workDir) {
+			log.Fatal("Dir is not exist")
+		}
+		logger.Printf("Your choise is a: %v\n", workDir)
+	}
+	return workDir
+}
+
 //SetVerbose to assign verbose output
-func SetVerbose(vValue bool) {
-	if vValue {
-		verbose = vValue
-		fmt.Printf("Setted verbose flag: %v\n", vValue)
+func SetVerbose(v bool) {
+	if v {
+		verbose = v
+		fmt.Printf("Setted verbose flag: %v\n", v)
 	}
 }
 func puts(s ...string) {
@@ -94,25 +124,6 @@ func checkEt(logger *log.Logger) {
 	}
 }
 
-//Check or ask workdir
-func checkWorkDir(logger *log.Logger) string {
-	if workDir != "" {
-		if !checkPath(workDir) {
-			log.Fatal("Dir is not exist")
-		}
-	} else {
-		fmt.Print("Put collection path: ")
-		reader := bufio.NewReader(os.Stdin)
-		inputData, err := reader.ReadString('\n')
-		check(err)
-		workDir = strings.TrimSpace(inputData)
-		if !checkPath(workDir) {
-			log.Fatal("Dir is not exist")
-		}
-		logger.Printf("Your choise is a: %v\n", workDir)
-	}
-	return workDir
-}
 func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
 	//fileExt: array fo file extensions to processing
 	fileExt := []string{
@@ -156,10 +167,33 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 			fProcessing := fileToProcessing(path, logger)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
 			if !fProcessing.toSkip {
+				if checkDublesFlag {
+					addToCheckDubles(&path)
+				}
 				if fProcessing.doByExiftool && exiftoolExist {
 					forExifTool = append(forExifTool, path)
 				} else {
 					dirFiles = append(dirFiles, path)
+				}
+			}
+		}
+		if checkDublesFlag {
+			for key, val := range allFiles {
+				delete(allFiles, key)
+				foundDubles := []string{}
+				for k, v := range allFiles {
+					if v == val && k != key {
+						foundDubles = append(foundDubles, k)
+					}
+				}
+				if len(foundDubles) > 0 {
+					for _, item := range foundDubles {
+						logger.Println("Found dublicate of file: ", key)
+						delete(allFiles, item)
+						e := os.Remove(item)
+						check(e)
+						logger.Println("Removed file: ", item)
+					}
 				}
 			}
 		}
@@ -174,6 +208,7 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
 	return dirFiles, forExifTool
 }
+
 func fileToProcessing(file string, logger *log.Logger) processingAttr {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
@@ -198,6 +233,18 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 		filematched.doByExiftool = true
 		return filematched
 	}
+}
+func addToCheckDubles(s *string) {
+	f, err := os.Open(*s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+	allFiles[*s] = string(h.Sum(nil))
 }
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
