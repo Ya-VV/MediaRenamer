@@ -10,7 +10,6 @@ import (
 
 var cfgFile string
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "yaRenamer",
 	Short: "A brief description of your application",
@@ -20,8 +19,6 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 		pkg.LetsGo()
 	},
@@ -61,26 +58,4 @@ func initConfig() {
 		pkg.SetCheckDublesFlag(checkDubleStatus)
 	}
 	pkg.SetWorkDir(rootCmd.Flags().GetString("dir"))
-	// if cfgFile != "" {
-	// 	// Use config file from the flag.
-	// 	viper.SetConfigFile(cfgFile)
-	// } else {
-	// 	// Find home directory.
-	// 	home, err := homedir.Dir()
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		os.Exit(1)
-	// 	}
-
-	// 	// Search config in home directory with name ".snike" (without extension).
-	// 	viper.AddConfigPath(home)
-	// 	viper.SetConfigName(".snike")
-	// }
-
-	// viper.AutomaticEnv() // read in environment variables that match
-
-	// // If a config file is found, read it in.
-	// if err := viper.ReadInConfig(); err == nil {
-	// 	fmt.Println("Using config file:", viper.ConfigFileUsed())
-	// }
 }

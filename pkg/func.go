@@ -54,6 +54,7 @@ type processingAttr struct {
 }
 
 var exiftoolExist, verbose, checkDublesFlag bool
+var removedCount int
 var timeNow = time.Now()
 var exifBirthday int64 = 2002
 var workDir string
@@ -177,26 +178,7 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 				}
 			}
 		}
-		if checkDublesFlag {
-			for key, val := range allFiles {
-				delete(allFiles, key)
-				foundDubles := []string{}
-				for k, v := range allFiles {
-					if v == val && k != key {
-						foundDubles = append(foundDubles, k)
-					}
-				}
-				if len(foundDubles) > 0 {
-					for _, item := range foundDubles {
-						logger.Println("Found dublicate of file: ", key)
-						delete(allFiles, item)
-						e := os.Remove(item)
-						check(e)
-						logger.Println("Removed file: ", item)
-					}
-				}
-			}
-		}
+
 		return nil
 	})
 
@@ -206,30 +188,65 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 	}
 	logger.Println("Found " + strconv.Itoa(len(dirFiles)) + " files for processing without exiftool")
 	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
+
+	if checkDublesFlag {
+		for key, val := range allFiles {
+			delete(allFiles, key)
+			foundDubles := []string{}
+			for k, v := range allFiles {
+				if v == val && k != key {
+					foundDubles = append(foundDubles, k)
+				}
+			}
+			if len(foundDubles) > 0 {
+				for _, item := range foundDubles {
+					logger.Println("Found dublicate of file: ", key)
+					delete(allFiles, item)
+					err := os.Remove(item)
+					check(err)
+					if verbose {
+						logger.Println("Removed file: ", item)
+					}
+					removedCount++
+				}
+			}
+		}
+	}
+
 	return dirFiles, forExifTool
 }
 
 func fileToProcessing(file string, logger *log.Logger) processingAttr {
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
-	logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
+	if verbose {
+		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
+	}
 	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                                        //шаблон файлов обработанных раннее
 	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}[\._:-]?\s?\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
+		if verbose {
+			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
+		}
 		filematched.toSkip = true
 		return filematched
 	case match(patternToSkip, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
+		if verbose {
+			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
+		}
 		filematched.toSkip = true
 		return filematched
 	case match(patternDateInName, fileNameBase):
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by DateInName")
+		if verbose {
+			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by DateInName")
+		}
 		filematched.doByName = true
 		return filematched
 	default:
-		logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")
+		if verbose {
+			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")
+		}
 		filematched.doByExiftool = true
 		return filematched
 	}
