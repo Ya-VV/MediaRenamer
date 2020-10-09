@@ -17,7 +17,7 @@ Available arguments:
 <ul>
 <li> version: the version of the utility</li>
 <li> --dir: path for processing</li>
-<li> -c --verbose: verbose output</li>
+<li> -v --verbose: verbose output</li>
 <li> --check-dublicates: find and remove duplicates based on the file md5sum</li>
 </ul>
 <br>
