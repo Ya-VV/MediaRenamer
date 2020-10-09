@@ -23,12 +23,12 @@ Available arguments:
 <br>
 Example:<br>
 <ul>
-<li> yaRenamer</li>
-<li> yaRenamer -v</li>
-<li> yaRenamer --verbose</li>
-<li> yaRenamer -v --dir /path/to/directory</li>
-<li> yaRenamer -verbose --dir /path/to/directory</li>
-<li> yaRenamer -verbose --dir /path/to/directory --check-dublicates</li>
+<li> ./yaRenamer</li>
+<li> ./yaRenamer -v</li>
+<li> ./yaRenamer --verbose</li>
+<li> ./yaRenamer -v --dir /path/to/directory</li>
+<li> ./yaRenamer --verbose --dir /path/to/directory</li>
+<li> ./yaRenamer --verbose --dir /path/to/directory --check-dublicates</li>
 </ul>
 Supported formats:<br>
 <sup>
