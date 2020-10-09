@@ -60,6 +60,14 @@ var exifBirthday int64 = 2002
 var workDir string
 var allFiles = make(map[string]string)
 
+//SetVerbose to assign verbose output
+func SetVerbose(v bool) {
+	if v {
+		verbose = v
+		fmt.Printf("Setted verbose flag: %v\n", v)
+	}
+}
+
 //SetCheckDublesFlag set to check dubles  from arguments
 func SetCheckDublesFlag(v bool) {
 	if v {
@@ -92,14 +100,6 @@ func checkWorkDir(logger *log.Logger) string {
 		logger.Printf("Your choise is a: %v\n", workDir)
 	}
 	return workDir
-}
-
-//SetVerbose to assign verbose output
-func SetVerbose(v bool) {
-	if v {
-		verbose = v
-		fmt.Printf("Setted verbose flag: %v\n", v)
-	}
 }
 func puts(s ...string) {
 	fmt.Println(s)
