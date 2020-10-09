@@ -20,6 +20,16 @@ Available arguments:
 <li> -c --verbose: verbose output;</li>
 <li> --check: find and remove duplicates based on the hash;</li>
 </ul>
+<br>
+Example:<br>
+<ul>
+<li> yaRenamer</li>
+<li> yaRenamer -v</li>
+<li> yaRenamer --verbose</li>
+<li> yaRenamer -v --dir /path/to/directory</li>
+<li> yaRenamer -verbose --dir /path/to/directory</li>
+<li> yaRenamer -verbose --dir /path/to/directory --check-dublicates</li>
+</ul>
 Supported formats:<br>
 <sup>
 "3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
