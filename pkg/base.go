@@ -31,9 +31,13 @@ func LetsGo() {
 		logger.Println("Nothin to do!\nBye :)")
 		os.Exit(0)
 	}
+
 	if len(dirFiles) > 0 {
 		mustCompile := regexp.MustCompile(`.*(\d{4})[\._:-]?(\d{2})[\._:-]?(\d{2})[\._:-]?\s?(\d{2})[\._:-]?(\d{2})[\._:-]?(\d{2}).*`)
 		for _, item := range dirFiles {
+			if !fileExists(item) {
+				continue
+			}
 			logger.SetPrefix(filepath.Base(item) + " ")
 			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))
 			if len(nameSlice) == 0 {
@@ -59,6 +63,9 @@ func LetsGo() {
 		}
 		defer et.Close()
 		for _, item := range forExifTool {
+			if !fileExists(item) {
+				continue
+			}
 			logger.SetPrefix(filepath.Base(item) + " ")
 			exifDateParsed, err := getExif(et, item, logger)
 			if err != nil { //if getExif data is failed
@@ -77,4 +84,7 @@ func LetsGo() {
 	}
 	logger.SetPrefix("INFO: ")
 	logger.Println("Total files processed: ", totalFiles)
+	if checkDublesFlag {
+		logger.Println("Total removed dublicates: ", removedCount)
+	}
 }

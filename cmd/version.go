@@ -11,7 +11,7 @@ var versionCmd = &cobra.Command{
 	Short: "yaRenamer version",
 	Long:  `Show version of the yaRenamer utility.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("yaRenamer: version Alpha0.1")
+		fmt.Println("yaRenamer: version Alpha")
 	},
 }
 
