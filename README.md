@@ -3,22 +3,22 @@ Utility for batch processing files in a directory.<br>
 Renames all supported formats based on creation date, resulting in one pattern: YearMonthDayofmonth_HourMinuteSecond (example: 20201009_115900)<br>
 Creation date is retrieved by priority:
 <ul>
-<li> the date recorded in the file name, for example, IMG_20201009_115900.jpg will be renamed to 20201009_115900.jpg;</li>
-<li> exif data in file;</li>
-<li> filesystem timestamp;</li>
+<li> the date recorded in the file name, for example, IMG_20201009_115900.jpg will be renamed to 20201009_115900.jpg</li>
+<li> exif data in file</li>
+<li> filesystem timestamp</li>
 </ul>
 Required pre-installed dependencies: exiftool (https://exiftool.org).<br>
 Using:
 <ul>
-<li> launch without parameters - manual put path and further processing;</li>
-<li> launch with preset arguments;</li>
+<li> launch without parameters - manual put path and further processing</li>
+<li> launch with preset arguments</li>
 </ul>
 Available arguments:
 <ul>
-<li> version: the version of the utility;</li>
-<li> --dir: path for processing;</li>
-<li> -c --verbose: verbose output;</li>
-<li> --check: find and remove duplicates based on the hash;</li>
+<li> version: the version of the utility</li>
+<li> --dir: path for processing</li>
+<li> -c --verbose: verbose output</li>
+<li> --check: find and remove duplicates based on the hash</li>
 </ul>
 <br>
 Example:<br>
