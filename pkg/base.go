@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"github.com/barasher/go-exiftool"
 )
@@ -33,22 +32,20 @@ func LetsGo() {
 	}
 
 	if len(dirFiles) > 0 {
-		mustCompile := regexp.MustCompile(`.*(\d{4})[\._:-]?(\d{2})[\._:-]?(\d{2})[\._:-]?\s?(\d{2})[\._:-]?(\d{2})[\._:-]?(\d{2}).*`)
 		for _, item := range dirFiles {
 			if !fileExists(item) {
 				continue
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
-			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))
-			if areYearActual(nameSlice[1], logger); err != nil {
+			if newName, err := parseAndCheckDate(filepath.Base(item), logger); err == nil {
+				renamer(item, newName, logger)
+				logger.Println("DateInName: new name is a: " + newName + " of file: " + item)
+			} else {
+				logger.Println(err)
 				logger.Println("Moved to exifRenamer func; when DateInName data corrupted")
 				forExifTool = append(forExifTool, item)
-				fmt.Println(err)
 				continue
 			}
-			newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
-			renamer(item, newName, logger)
-			logger.Println("DateInName: new name is a: " + newName + "of file: " + item)
 		}
 	}
 	if len(forExifTool) > 0 && exiftoolExist {
