@@ -17,18 +17,18 @@ Available arguments:
 <ul>
 <li> version: the version of the utility</li>
 <li> --dir: path for processing</li>
-<li> -c --verbose: verbose output</li>
+<li> -v --verbose: verbose output</li>
 <li> --check-dublicates: find and remove duplicates based on the file md5sum</li>
 </ul>
 <br>
 Example:<br>
 <ul>
-<li> yaRenamer</li>
-<li> yaRenamer -v</li>
-<li> yaRenamer --verbose</li>
-<li> yaRenamer -v --dir /path/to/directory</li>
-<li> yaRenamer -verbose --dir /path/to/directory</li>
-<li> yaRenamer -verbose --dir /path/to/directory --check-dublicates</li>
+<li> ./yaRenamer</li>
+<li> ./yaRenamer -v</li>
+<li> ./yaRenamer --verbose</li>
+<li> ./yaRenamer -v --dir /path/to/directory</li>
+<li> ./yaRenamer --verbose --dir /path/to/directory</li>
+<li> ./yaRenamer --verbose --dir /path/to/directory --check-dublicates</li>
 </ul>
 Supported formats:<br>
 <sup>
