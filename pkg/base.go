@@ -13,7 +13,7 @@ import (
 
 //LetsGo basis action
 func LetsGo() {
-	logFile, err := os.OpenFile(timeNow.Format("20060102150405")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile("yarenamer-"+timeNow.Format("20060102150405")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println(err)
 	}
@@ -40,12 +40,7 @@ func LetsGo() {
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
 			nameSlice := mustCompile.FindStringSubmatch(filepath.Base(item))
-			if len(nameSlice) == 0 {
-				logger.Println("Moved to exifRenamer func; when DateInName data corrupted")
-				forExifTool = append(forExifTool, item)
-				continue
-			}
-			if areYearActual(nameSlice[1], logger); err == nil {
+			if areYearActual(nameSlice[1], logger); err != nil {
 				logger.Println("Moved to exifRenamer func; when DateInName data corrupted")
 				forExifTool = append(forExifTool, item)
 				fmt.Println(err)
@@ -74,12 +69,13 @@ func LetsGo() {
 				useFSTimeStamp(item, logger)
 			} else {
 				renamer(item, exifDateParsed, logger)
-				logger.Println("main:exifToolRename; newName: " + exifDateParsed)
+				logger.Println("exifToolRename; newName: " + exifDateParsed)
 			}
 		}
 	} else {
 		if !exiftoolExist {
-			logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing")
+			logger.Println("SKIPPED: ", len(forExifTool), " files in ExifTool processing. Because exiftool is not installed.")
+			totalFiles = totalFiles - len(forExifTool)
 		}
 	}
 	logger.SetPrefix("INFO: ")

@@ -12,20 +12,16 @@ var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "yaRenamer",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Utility for batch processing files in a directory, resulting in one pattern: YearMonthDayofmonth_HourMinuteSecond",
+	Long: `Utility for batch processing files in a directory.
+	Renames all supported formats based on creation date, resulting in one pattern:
+	YearMonthDayofmonth_HourMinuteSecond (example: 20201009_115900).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		pkg.LetsGo()
 	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -36,20 +32,11 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.snike.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
 	rootCmd.Flags().BoolP("verbose", "v", false, "set verbose output")
 	rootCmd.Flags().Bool("check-dublicates", false, "to check files dublicates")
 	rootCmd.Flags().String("dir", "", "Put the path to directory")
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if verboseStatus, err := rootCmd.Flags().GetBool("verbose"); err == nil {
 		pkg.SetVerbose(verboseStatus)

@@ -161,16 +161,17 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 			logger.Printf("skipping a dir without errors: %+v \n", info.Name())
 			return filepath.SkipDir
 		}
-		// fmt.Printf("visited file or dir: %q\n", path)
-
-		//проверка на подходящее расширение файла (в нижнем регистре) со слайса fileExt + признак по которому обрабатывать
+		if verbose {
+			logger.Printf("visited file or dir: %q\n", path)
+		}
+		//проверка на подходящее расширение файла
 		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
+			if checkDublesFlag {
+				addToCheckDubles(&path, logger)
+			}
 			fProcessing := fileToProcessing(path, logger)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
 			if !fProcessing.toSkip {
-				if checkDublesFlag {
-					addToCheckDubles(&path)
-				}
 				if fProcessing.doByExiftool && exiftoolExist {
 					forExifTool = append(forExifTool, path)
 				} else {
@@ -251,13 +252,14 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 		return filematched
 	}
 }
-func addToCheckDubles(s *string) {
+func addToCheckDubles(s *string, logger *log.Logger) {
 	f, err := os.Open(*s)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 	h := md5.New()
+	logger.Println("Calculate md5sum of: ", s)
 	if _, err := io.Copy(h, f); err != nil {
 		log.Fatal(err)
 	}
@@ -361,6 +363,9 @@ func areYearActual(parsedYearStr string, logger *log.Logger) error {
 		return errors.New("Parsed year is corrupted")
 	} else if year < exifBirthday {
 		logger.Printf("Parsed year is corrupted: %v. Less that exifBirthday: %v\n", year, exifBirthday)
+		return errors.New("Parsed year is corrupted")
+	} else if len(parsedYearStr) == 0 {
+		logger.Printf("Parsed year is corrupted: %v\n", parsedYearStr)
 		return errors.New("Parsed year is corrupted")
 	}
 	return nil
