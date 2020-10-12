@@ -37,7 +37,8 @@ func LetsGo() {
 				continue
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
-			if newName, err := parseAndCheckDate(filepath.Base(item), logger); err == nil {
+			newName, err := parseAndCheckDate(filepath.Base(item), logger)
+			if err == nil {
 				renamer(item, newName, logger)
 				logger.Println("DateInName: new name is a: " + newName + " of file: " + item)
 			} else {
