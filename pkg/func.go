@@ -80,6 +80,7 @@ func SetCheckDublesFlag(v bool) {
 func SetWorkDir(s string, err error) {
 	check(err)
 	workDir = s
+	fmt.Println("Set workdir to: ", s)
 }
 
 //Check or ask workdir
@@ -314,7 +315,7 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
 	fileInfos := et.ExtractMetadata(filePath)
 	fileExifStrings := []string{"CreateDate", "DateTimeOriginal", "ModifyDate", "Date", "FileModifyDate", "File Modification Date/Time"}
-	timeLayout := regexp.MustCompile(`.*(\d{4})[\._:-]?(\d{2})[\._:-]?(\d{2})[\._:-]?\s?(\d{2})[\._:-]?(\d{2})[\._:-]?(\d{2}).*`)
+	timeExp := regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2})[\._:-]?\s?(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
@@ -328,12 +329,18 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 		for _, exifString := range fileExifStrings {
 			if exifTime, err := fileInfo.GetString(exifString); err == nil {
 				logger.Printf("getExif:checkField; Exif field <<<%v>>> matched\n", exifString)
-				exifSliceParsed := timeLayout.FindStringSubmatch(exifTime)
-				if err := areYearActual(exifSliceParsed[1], logger); err != nil {
+				exifSliceParsed := timeExp.FindStringSubmatch(exifTime)
+				result := make(map[string]string)
+				for i, name := range timeExp.SubexpNames() {
+					if i != 0 && name != "" {
+						result[name] = exifSliceParsed[i]
+					}
+				}
+				if err := areYearActual(result["year"], logger); err != nil {
 					logger.Printf("ERROR: exif data (file year) corrupted: %v. Checking next exif string\n", exifSliceParsed[1])
 					continue
 				}
-				exifDateParsed := exifSliceParsed[1] + exifSliceParsed[2] + exifSliceParsed[3] + "_" + exifSliceParsed[4] + exifSliceParsed[5] + exifSliceParsed[6]
+				exifDateParsed := result["year"] + result["month"] + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
 				return exifDateParsed, nil
 			}
 		}

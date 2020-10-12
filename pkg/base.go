@@ -48,7 +48,7 @@ func LetsGo() {
 			}
 			newName := nameSlice[1] + nameSlice[2] + nameSlice[3] + "_" + nameSlice[4] + nameSlice[5] + nameSlice[6]
 			renamer(item, newName, logger)
-			logger.Println("New name is a: " + newName + "of file: " + item)
+			logger.Println("DateInName: new name is a: " + newName + "of file: " + item)
 		}
 	}
 	if len(forExifTool) > 0 && exiftoolExist {
