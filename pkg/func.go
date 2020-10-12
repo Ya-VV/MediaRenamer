@@ -128,6 +128,7 @@ func checkEt(logger *log.Logger) {
 }
 
 func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
+	logger.Println("Started search of supported files on selected path.")
 	//fileExt: array fo file extensions to processing
 	fileExt := []string{
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
@@ -359,14 +360,11 @@ func areYearActual(parsedYearStr string, logger *log.Logger) error {
 	year, err := strconv.ParseInt(parsedYearStr, 10, 64)
 	check(err)
 	if year > int64(timeNow.Year()) {
-		logger.Printf("Parsed year is corrupted: %v. Biger that now: %v\n", year, int64(timeNow.Year()))
-		return errors.New("Parsed year is corrupted")
+		return fmt.Errorf("Parsed year is corrupted: %v. Biger that now: %v", year, int64(timeNow.Year()))
 	} else if year < exifBirthday {
-		logger.Printf("Parsed year is corrupted: %v. Less that exifBirthday: %v\n", year, exifBirthday)
-		return errors.New("Parsed year is corrupted")
+		return fmt.Errorf("Parsed year is corrupted: %v. Less that exifBirthday: %v", year, exifBirthday)
 	} else if len(parsedYearStr) == 0 {
-		logger.Printf("Parsed year is corrupted: %v\n", parsedYearStr)
-		return errors.New("Parsed year is corrupted")
+		return fmt.Errorf("Parsed year is corrupted: %v", parsedYearStr)
 	}
 	return nil
 }
@@ -378,7 +376,8 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 			result[name] = exifSliceParsed[i]
 		}
 	}
-	if err := areYearActual(result["year"], logger); err != nil {
+	err := areYearActual(result["year"], logger)
+	if err != nil {
 		logger.Println(err)
 		return "", err
 	}
