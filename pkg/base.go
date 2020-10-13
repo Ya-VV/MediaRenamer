@@ -8,13 +8,20 @@ import (
 	"path/filepath"
 
 	"github.com/barasher/go-exiftool"
+	homedir "github.com/mitchellh/go-homedir"
 )
 
 //LetsGo basis action
 func LetsGo() {
-	logFile, err := os.OpenFile("yarenamer-"+timeNow.Format("20060102150405")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Find home directory.
+	home, err := homedir.Dir()
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	logFile, err := os.OpenFile(home+"/"+"yarenamer-"+timeNow.Format("2006-01-02_15-04-05")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Panic(err)
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	logger := log.New(mw, "INFO: ", log.Flags()&^(log.Ldate|log.Ltime))
@@ -50,6 +57,7 @@ func LetsGo() {
 		}
 	}
 	if len(forExifTool) > 0 && exiftoolExist {
+		logger.SetPrefix("INFO: ")
 		et, err := exiftool.NewExiftool()
 		if err != nil {
 			panic(fmt.Errorf("Error when intializing: %v", err))
@@ -57,12 +65,14 @@ func LetsGo() {
 		defer et.Close()
 		for _, item := range forExifTool {
 			if !fileExists(item) {
+				if verbose {
+					logger.Println("exifProcessing::skip, the file no exist: ", item)
+				}
 				continue
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
 			exifDateParsed, err := getExif(et, item, logger)
 			if err != nil { //if getExif data is failed
-				logger.Println(err)
 				logger.Println("func:fsTimeStamp; when exif data corrupted.")
 				useFSTimeStamp(item, logger)
 			} else {
