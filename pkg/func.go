@@ -59,7 +59,7 @@ var timeNow = time.Now()
 var exifBirthday int64 = 2002
 var workDir string
 var allFiles = make(map[string]string)
-var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2})[\._:-]?\s?(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
+var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 
 //SetVerbose to assign verbose output
 func SetVerbose(v bool) {
@@ -226,8 +226,8 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 	if verbose {
 		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
 	}
-	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                                        //шаблон файлов обработанных раннее
-	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}[\._:-]?\s?\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
+	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                               //шаблон файлов обработанных раннее
+	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
 		if verbose {
@@ -316,7 +316,7 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 }
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
 	fileInfos := et.ExtractMetadata(filePath)
-	fileExifStrings := []string{"CreateDate", "DateTimeOriginal", "ModifyDate", "Date", "FileModifyDate", "File Modification Date/Time"}
+	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "ModifyDate", "Modify Date", "Date", "Media Create Date", "Media Modify Date", "FileModifyDate", "Track Create Date", "Track Modify Date"}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
