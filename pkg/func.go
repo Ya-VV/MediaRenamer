@@ -316,7 +316,7 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 }
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
 	fileInfos := et.ExtractMetadata(filePath)
-	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "ModifyDate", "Modify Date", "Date", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date"}
+	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date"}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
