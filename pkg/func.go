@@ -315,8 +315,10 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 	check(err)
 }
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
+	var newName string
+	allDetectedDate := make(map[string]time.Time)
 	fileInfos := et.ExtractMetadata(filePath)
-	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date"}
+	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time"}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
@@ -329,14 +331,28 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 			}
 		}
 		for _, exifString := range fileExifStrings {
-			if exifTime, err := fileInfo.GetString(exifString); err == nil {
+			exifTime, err := fileInfo.GetString(exifString)
+			if err == nil {
 				logger.Printf("getExif:checkField; Exif field <<<%v>>> matched\n", exifString)
-				if newName, err := parseAndCheckDate(exifTime, logger); err == nil {
-					return newName, nil
-				} else {
+				suppositionName, err := parseAndCheckDate(exifTime, logger)
+				if err != nil {
 					logger.Println("ERROR: exif data corrupted. Checking next exif string.")
 					continue
+				} else {
+					t, err := time.Parse("20060102_150405", suppositionName)
+					check(err)
+					allDetectedDate[suppositionName] = t
 				}
+				for k, v := range allDetectedDate {
+					if newName == "" {
+						newName = k
+					} else {
+						if allDetectedDate[newName].Before(v) {
+							newName = k
+						}
+					}
+				}
+				return newName, nil
 			}
 		}
 	}
