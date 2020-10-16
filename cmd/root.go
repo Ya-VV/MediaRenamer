@@ -44,5 +44,8 @@ func initConfig() {
 	if checkDubleStatus, err := rootCmd.Flags().GetBool("check-dublicates"); err == nil {
 		pkg.SetCheckDublesFlag(checkDubleStatus)
 	}
-	pkg.SetWorkDir(rootCmd.Flags().GetString("dir"))
+	wdir, err := rootCmd.Flags().GetString("dir")
+	if err == nil && wdir != "" {
+		pkg.SetWorkDir(wdir)
+	}
 }

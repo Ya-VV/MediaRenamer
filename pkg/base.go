@@ -74,7 +74,13 @@ func LetsGo() {
 			exifDateParsed, err := getExif(et, item, logger)
 			if err != nil { //if getExif data is failed
 				logger.Println("func:fsTimeStamp; when exif data corrupted.")
-				useFSTimeStamp(item, logger)
+				err := useFSTimeStamp(item, logger)
+				if err != nil {
+					logger.Println("func::useFSTimeStamp FAILED, skipped file: ", item)
+					logger.Println(err)
+					totalFiles--
+					skippedCount++
+				}
 			} else {
 				renamer(item, exifDateParsed, logger)
 				logger.Println("exifToolRename; newName: " + exifDateParsed)
@@ -88,6 +94,9 @@ func LetsGo() {
 	}
 	logger.SetPrefix("INFO: ")
 	logger.Println("Total files processed: ", totalFiles)
+	if skippedCount > 0 {
+		logger.Println("Total files skipped: ", skippedCount)
+	}
 	if checkDublesFlag {
 		logger.Println("Total removed dublicates: ", removedCount)
 	}

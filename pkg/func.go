@@ -18,35 +18,6 @@ import (
 	"github.com/barasher/go-exiftool"
 )
 
-const (
-	stdLongMonth      = "January"
-	stdMonth          = "Jan"
-	stdNumMonth       = "1"
-	stdZeroMonth      = "01"
-	stdLongWeekDay    = "Monday"
-	stdWeekDay        = "Mon"
-	stdDay            = "2"
-	stdUnderDay       = "_2"
-	stdZeroDay        = "02"
-	stdHour           = "15"
-	stdHour12         = "3"
-	stdZeroHour12     = "03"
-	stdMinute         = "4"
-	stdZeroMinute     = "04"
-	stdSecond         = "5"
-	stdZeroSecond     = "05"
-	stdLongYear       = "2006"
-	stdYear           = "06"
-	stdPM             = "PM"
-	stdpm             = "pm"
-	stdTZ             = "MST"
-	stdISO8601TZ      = "Z0700"  // prints Z for UTC
-	stdISO8601ColonTZ = "Z07:00" // prints Z for UTC
-	stdNumTZ          = "-0700"  // always numeric
-	stdNumShortTZ     = "-07"    // always numeric
-	stdNumColonTZ     = "-07:00" // always numeric
-)
-
 type processingAttr struct {
 	toSkip       bool
 	doByName     bool
@@ -54,7 +25,7 @@ type processingAttr struct {
 }
 
 var exiftoolExist, verbose, checkDublesFlag bool
-var removedCount int
+var removedCount, skippedCount int
 var timeNow = time.Now()
 var exifBirthday int64 = 2002
 var workDir string
@@ -78,8 +49,7 @@ func SetCheckDublesFlag(v bool) {
 }
 
 //SetWorkDir set work directory from arguments
-func SetWorkDir(s string, err error) {
-	check(err)
+func SetWorkDir(s string) {
 	workDir = s
 	fmt.Println("Set workdir to: ", s)
 }
@@ -91,7 +61,7 @@ func checkWorkDir(logger *log.Logger) string {
 			log.Fatal("Dir is not exist")
 		}
 	} else {
-		fmt.Print("Put collection path: ")
+		fmt.Print("Put collection full path: ")
 		reader := bufio.NewReader(os.Stdin)
 		inputData, err := reader.ReadString('\n')
 		check(err)
@@ -102,9 +72,6 @@ func checkWorkDir(logger *log.Logger) string {
 		logger.Printf("Your choise is a: %v\n", workDir)
 	}
 	return workDir
-}
-func puts(s ...string) {
-	fmt.Println(s)
 }
 func check(err error) {
 	if err != nil {
@@ -361,17 +328,24 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 func fsTimeStamp(item string) (string, error) {
 	fInfo, err := os.Stat(item)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	fTimestamp := fInfo.ModTime()
-	fModTimeNewName := fTimestamp.Format(stdLongYear + stdZeroMonth + stdZeroDay + "_" + stdHour + stdZeroMinute + stdZeroSecond)
+	fModTimeNewName := fTimestamp.Format("20060102_150405")
 	return fModTimeNewName, nil
 }
-func useFSTimeStamp(fPath string, logger *log.Logger) {
+func useFSTimeStamp(fPath string, logger *log.Logger) error {
 	newName, err := fsTimeStamp(fPath)
-	check(err)
+	if err != nil {
+		return err
+	}
+	_, err = parseAndCheckDate(newName, logger)
+	if err != nil {
+		return err
+	}
 	logger.Println("fsTimeStamp:rename; newName: " + newName)
 	renamer(fPath, newName, logger)
+	return nil
 }
 func areYearActual(parsedYearStr string, logger *log.Logger) error {
 	year, err := strconv.ParseInt(parsedYearStr, 10, 64)
