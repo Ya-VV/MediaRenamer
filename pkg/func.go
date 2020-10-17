@@ -194,7 +194,7 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 	if verbose {
 		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
 	}
-	patternToSkip := `(^\d{8}_\d{6}\.)|(^\d{8}_\d{6}\(\d+\)\.)`                               //шаблон файлов обработанных раннее
+	patternToSkip := `(^\d{4}-\d{2}-\d{2}_\d{6}\.)|(^\d{4}-\d{2}-\d{2}_\d{6}\(\d+\)\.)`       //шаблон файлов обработанных раннее
 	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
@@ -286,17 +286,14 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 	var newName string
 	allDetectedDate := make(map[string]time.Time)
 	fileInfos := et.ExtractMetadata(filePath)
-	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time"}
+	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time", "FileModifyDate"}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
 			continue
 		}
 		if verbose {
-			fmt.Println("Exif data of the file: ", filePath)
-			for k, v := range fileInfo.Fields {
-				fmt.Printf("\t [%v] %v\n", k, v)
-			}
+			logger.Println("Exif data of the file: \n", fileInfo.Fields)
 		}
 		for _, exifString := range fileExifStrings {
 			exifTime, err := fileInfo.GetString(exifString)
@@ -348,18 +345,6 @@ func useFSTimeStamp(fPath string, logger *log.Logger) error {
 	renamer(fPath, newName, logger)
 	return nil
 }
-func areYearActual(parsedYearStr string, logger *log.Logger) error {
-	year, err := strconv.ParseInt(parsedYearStr, 10, 64)
-	check(err)
-	if year > int64(timeNow.Year()) {
-		return fmt.Errorf("Parsed year is corrupted: %v. Biger that now: %v", year, int64(timeNow.Year()))
-	} else if year < exifBirthday {
-		return fmt.Errorf("Parsed year is corrupted: %v. Less that exifBirthday: %v", year, exifBirthday)
-	} else if len(parsedYearStr) == 0 {
-		return fmt.Errorf("Parsed year is corrupted: %v", parsedYearStr)
-	}
-	return nil
-}
 func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 	exifSliceParsed := timeExp.FindStringSubmatch(str)
 	result := make(map[string]string)
@@ -368,11 +353,24 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 			result[name] = exifSliceParsed[i]
 		}
 	}
-	err := areYearActual(result["year"], logger)
+	err := areDateActual(result, logger)
 	if err != nil {
 		logger.Println(err)
 		return "", err
 	}
 	newName := result["year"] + "-" + result["month"] + "-" + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
 	return newName, nil
+}
+func areDateActual(result map[string]string, logger *log.Logger) error {
+	parseStr := result["year"] + result["month"] + result["day"] + result["hour"] + result["min"] + result["sec"]
+	parseTime, err := time.Parse("20060102150405", parseStr)
+	if err != nil {
+		return err
+	}
+	if parseTime.Year() > timeNow.Year() {
+		return fmt.Errorf("Parsed year is corrupted: %v. Biger that now: %v", parseTime.Year(), timeNow.Year())
+	} else if int64(parseTime.Year()) < exifBirthday {
+		return fmt.Errorf("Parsed year is corrupted: %v. Less that exifBirthday: %v", int64(parseTime.Year()), exifBirthday)
+	}
+	return nil
 }
