@@ -31,6 +31,7 @@ var exifBirthday int64 = 2002
 var workDir string
 var allFiles = make(map[string]string)
 var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
+var defNewNameLayout = "2006-01-02_150405"
 
 //SetVerbose to assign verbose output
 func SetVerbose(v bool) {
@@ -306,7 +307,7 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 					logger.Println("ERROR: exif data corrupted. Checking next exif string.")
 					continue
 				} else {
-					t, err := time.Parse("20060102_150405", suppositionName)
+					t, err := time.Parse(defNewNameLayout, suppositionName)
 					check(err)
 					allDetectedDate[suppositionName] = t
 				}
@@ -331,7 +332,7 @@ func fsTimeStamp(item string) (string, error) {
 		return "", err
 	}
 	fTimestamp := fInfo.ModTime()
-	fModTimeNewName := fTimestamp.Format("20060102_150405")
+	fModTimeNewName := fTimestamp.Format(defNewNameLayout)
 	return fModTimeNewName, nil
 }
 func useFSTimeStamp(fPath string, logger *log.Logger) error {
@@ -372,6 +373,6 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 		logger.Println(err)
 		return "", err
 	}
-	newName := result["year"] + result["month"] + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
+	newName := result["year"] + "-" + result["month"] + "-" + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
 	return newName, nil
 }
