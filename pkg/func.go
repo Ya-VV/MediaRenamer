@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -23,13 +24,17 @@ type processingAttr struct {
 	doByName     bool
 	doByExiftool bool
 }
+type calcMd5 struct {
+	strPath string
+	hash    []byte
+}
 
 var exiftoolExist, verbose, checkDublesFlag bool
 var removedCount, skippedCount int
 var timeNow = time.Now()
 var exifBirthday int64 = 2002
 var workDir string
-var allFiles = make(map[string]string)
+var allFiles = make(map[string][]byte)
 var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 var defNewNameLayout = "2006-01-02_150405"
 
@@ -138,7 +143,7 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 		//проверка на подходящее расширение файла
 		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
 			if checkDublesFlag {
-				addToCheckDubles(&path, logger)
+				allFiles[path] = []byte{}
 			}
 			fProcessing := fileToProcessing(path, logger)
 			// не добавляю в мапу для обработки если файл в этом не нуждается
@@ -156,23 +161,34 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 
 	if err != nil {
 		logger.Printf("error walking the path %q: %v\n", workDir, err)
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	logger.Println("Found " + strconv.Itoa(len(dirFiles)) + " files for processing without exiftool")
 	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
 
 	if checkDublesFlag {
+
+		calcMd5chan := make(chan calcMd5)
+		for path := range allFiles {
+			go md5Calculate(path, calcMd5chan, logger)
+		}
+		for i := 0; i < len(allFiles); i++ {
+			itemMd5 := <-calcMd5chan
+			allFiles[itemMd5.strPath] = itemMd5.hash
+		}
+
 		for key, val := range allFiles {
 			delete(allFiles, key)
 			foundDubles := []string{}
 			for k, v := range allFiles {
-				if v == val && k != key {
+				res := bytes.Compare(v, val)
+				if res == 0 && k != key {
+					logger.Println("Found dublicate of file: ", key, "\n\t--->", k)
 					foundDubles = append(foundDubles, k)
 				}
 			}
 			if len(foundDubles) > 0 {
 				for _, item := range foundDubles {
-					logger.Println("Found dublicate of file: ", key)
 					delete(allFiles, item)
 					err := os.Remove(item)
 					check(err)
@@ -223,18 +239,18 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 		return filematched
 	}
 }
-func addToCheckDubles(s *string, logger *log.Logger) {
-	f, err := os.Open(*s)
+func md5Calculate(s string, channel chan calcMd5, logger *log.Logger) {
+	f, err := os.Open(s)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	defer f.Close()
+	logger.Println("Calculate md5sum of: ", s)
 	h := md5.New()
-	logger.Println("Calculate md5sum of: ", *s)
 	if _, err := io.Copy(h, f); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
-	allFiles[*s] = string(h.Sum(nil))
+	channel <- calcMd5{strPath: s, hash: h.Sum(nil)}
 }
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
