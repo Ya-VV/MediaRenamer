@@ -163,8 +163,8 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 		logger.Printf("error walking the path %q: %v\n", workDir, err)
 		log.Panic(err)
 	}
-	logger.Println("Found " + strconv.Itoa(len(dirFiles)) + " files for processing without exiftool")
-	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
+	logger.Println("Found ", len(dirFiles), " files for processing without exiftool")
+	logger.Println("Found ", len(forExifTool), " files for processing via exiftool")
 
 	if checkDublesFlag {
 

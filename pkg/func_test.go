@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-var l log.Logger
-
-// log.SetOutput(os.Stdout)
+var l = log.New(os.Stdout, "TESTING: ", log.Lshortfile)
 
 func TestWalking(t *testing.T) {
 	mydir, err := os.Getwd()
@@ -18,6 +16,11 @@ func TestWalking(t *testing.T) {
 		fmt.Println(err)
 	}
 	testdata := path.Join(mydir, "testdata")
-	t.Error(testdata)
-
+	getDateInName, getDateInExif := walkingOnFilesystem(testdata, l)
+	fmt.Println(getDateInName, getDateInExif)
+	wantDateInName := 1
+	wantDateInExif := 2
+	if len(getDateInExif) != wantDateInExif || len(getDateInName) != wantDateInName {
+		t.Error("some wrong")
+	}
 }
