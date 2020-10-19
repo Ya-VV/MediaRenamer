@@ -299,17 +299,17 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 	check(err)
 }
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
-	var newName string
+	newName := ""
 	allDetectedDate := make(map[string]time.Time)
 	fileInfos := et.ExtractMetadata(filePath)
 	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time", "FileModifyDate"}
+	if verbose {
+		logger.Println("Exif data of the file: \n", fileInfos[0].Fields)
+	}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
 			continue
-		}
-		if verbose {
-			logger.Println("Exif data of the file: \n", fileInfo.Fields)
 		}
 		for _, exifString := range fileExifStrings {
 			exifTime, err := fileInfo.GetString(exifString)
@@ -324,18 +324,19 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 					check(err)
 					allDetectedDate[suppositionName] = t
 				}
-				for k, v := range allDetectedDate {
-					if newName == "" {
-						newName = k
-					} else {
-						if allDetectedDate[newName].Before(v) {
-							newName = k
-						}
-					}
-				}
-				return newName, nil
 			}
 		}
+		for k, v := range allDetectedDate {
+			if newName == "" {
+				newName = k
+				continue
+			} else {
+				if allDetectedDate[newName].After(v) {
+					newName = k
+				}
+			}
+		}
+		return newName, nil
 	}
 	return "", errors.New("ERROR: exif data corrupted")
 }
