@@ -76,6 +76,8 @@ func checkWorkDir(logger *log.Logger) string {
 			log.Fatal("Dir is not exist")
 		}
 		logger.Printf("Your choise is a: %v\n", workDir)
+		//search for duplicates
+		//enable verbose mode?
 	}
 	return workDir
 }

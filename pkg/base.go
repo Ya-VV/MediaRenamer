@@ -19,7 +19,7 @@ func LetsGo() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	logFile, err := os.OpenFile(home+"/"+"yarenamer-"+timeNow.Format("2006-01-02_15-04-05")+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(home+"/"+"yarenamer-"+timeNow.Format(defNewNameLayout)+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Panic(err)
 	}
