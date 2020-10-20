@@ -24,7 +24,7 @@ type processingAttr struct {
 	doByName     bool
 	doByExiftool bool
 }
-type calcMd5 struct {
+type resultMd5 struct {
 	strPath string
 	hash    []byte
 }
@@ -167,39 +167,9 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 	logger.Println("Found ", len(dirFiles), " files for processing without exiftool")
 	logger.Println("Found ", len(forExifTool), " files for processing via exiftool")
 
-	if checkDublesFlag {
-
-		calcMd5chan := make(chan calcMd5)
-		for path := range allFiles {
-			go md5Calculate(path, calcMd5chan, logger)
-		}
-		for i := 0; i < len(allFiles); i++ {
-			itemMd5 := <-calcMd5chan
-			allFiles[itemMd5.strPath] = itemMd5.hash
-		}
-
-		for key, val := range allFiles {
-			delete(allFiles, key)
-			foundDubles := []string{}
-			for k, v := range allFiles {
-				res := bytes.Compare(v, val)
-				if res == 0 && k != key {
-					logger.Println("Found dublicate of file: ", key, "\n\t--->", k)
-					foundDubles = append(foundDubles, k)
-				}
-			}
-			if len(foundDubles) > 0 {
-				for _, item := range foundDubles {
-					delete(allFiles, item)
-					err := os.Remove(item)
-					check(err)
-					if verbose {
-						logger.Println("Removed file: ", item)
-					}
-					removedCount++
-				}
-			}
-		}
+	if checkDublesFlag && len(allFiles) > 0 {
+		err := dublesChecking(allFiles, logger)
+		check(err)
 	}
 
 	return dirFiles, forExifTool
@@ -240,7 +210,58 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 		return filematched
 	}
 }
-func md5Calculate(s string, channel chan calcMd5, logger *log.Logger) {
+func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
+	// var wg sync.WaitGroup
+	calcMd5chan := make(chan resultMd5)
+	allFilesPath := []string{}
+	for k := range allFilesMap {
+		allFilesPath = append(allFilesPath, k)
+	}
+	batchSize := 10
+	batches := make([][]string, 0, (len(allFilesPath)+batchSize-1)/batchSize)
+	for batchSize < len(allFilesPath) {
+		allFilesPath, batches = allFilesPath[batchSize:], append(batches, allFilesPath[0:batchSize:batchSize])
+	}
+	batches = append(batches, allFilesPath)
+
+	for _, jobs := range batches {
+		for _, path := range jobs {
+			// wg.Add(1)
+			go md5Calculate(path, calcMd5chan, logger) //, &wg)
+		}
+		// wg.Wait()
+		for i := 0; i < len(jobs); i++ {
+			itemMd5 := <-calcMd5chan
+			allFilesMap[itemMd5.strPath] = itemMd5.hash
+		}
+	}
+
+	for key, val := range allFilesMap {
+		delete(allFilesMap, key)
+		foundDubles := []string{}
+		for k, v := range allFilesMap {
+			res := bytes.Compare(v, val)
+			if res == 0 && k != key {
+				logger.Println("Found dublicate of file: ", key, "\n\t--->", k)
+				foundDubles = append(foundDubles, k)
+			}
+		}
+		if len(foundDubles) > 0 {
+			for _, item := range foundDubles {
+				delete(allFilesMap, item)
+				err := os.Remove(item)
+				check(err)
+				if verbose {
+					logger.Println("Removed file: ", item)
+				}
+				removedCount++
+			}
+		}
+	}
+	return nil
+}
+func md5Calculate(s string, channel chan resultMd5, logger *log.Logger) { //, wg *sync.WaitGroup) {
+	// defer wg.Done()
 	f, err := os.Open(s)
 	if err != nil {
 		log.Panic(err)
@@ -251,7 +272,7 @@ func md5Calculate(s string, channel chan calcMd5, logger *log.Logger) {
 	if _, err := io.Copy(h, f); err != nil {
 		log.Panic(err)
 	}
-	channel <- calcMd5{strPath: s, hash: h.Sum(nil)}
+	channel <- resultMd5{strPath: s, hash: h.Sum(nil)}
 }
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
