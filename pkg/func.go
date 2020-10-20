@@ -59,7 +59,7 @@ func SetWorkDir(s string) {
 }
 
 //Check or ask workdir
-func checkWorkDir(logger *log.Logger) string {
+func checkWorkDir(logger *log.Logger) (workDir string) {
 	if workDir != "" {
 		if !checkPath(workDir) {
 			log.Fatal("Dir is not exist")
@@ -77,7 +77,7 @@ func checkWorkDir(logger *log.Logger) string {
 		//search for duplicates
 		//enable verbose mode?
 	}
-	return workDir
+	return
 }
 func check(err error) {
 	if err != nil {
@@ -100,10 +100,11 @@ func checkEt(logger *log.Logger) {
 	}
 }
 
-func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
+func walkingOnFilesystem(workDir string, logger *log.Logger) (dirFiles, forExifTool []string) {
+	//var dirFiles []string для хранения списка подходящих файлов с датой в имени, где каждый item - полный путь;
+	//var forExifTool []string для хранения списка подходящих файлов для exiftool, где каждый item - полный путь;
 	var allFiles = make(map[string][]byte)
 	logger.Println("Started search of supported files on selected path.")
-	//fileExt: array fo file extensions to processing
 	fileExt := []string{
 		"3FR", ".3G2", ".3GP2", ".3GP", ".3GPP", ".A", ".AA", ".AAE", ".AAX", ".ACR", ".AFM", ".ACFM", ".AMFM", ".AI", ".AIT", ".AIFF",
 		".AIF", ".AIFC", ".APE", ".ARQ", ".ARW", ".ASF", ".AVI", ".AVIF", ".BMP", ".DIB", ".BPG", ".BTF", ".CHM", ".COS", ".CR2", ".CR3",
@@ -124,10 +125,6 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 		".TTC", ".TORRENT", ".TXT", ".VCF", ".VCARD", ".VOB", ".VRD", ".VSD", ".WAV", ".WEBM", ".WEBP", ".WMA", ".WMV", ".WTV", ".WV", ".X3F", ".XCF",
 		".XLS", ".XLT", ".XLSX", ".XLSM", ".XLSB", ".XLTX", ".XLTM", ".XMP", ".ZIP",
 	}
-	//для хранения списка подходящих файлов с датой в имени, где каждый item - полный путь;
-	var dirFiles []string
-	//для хранения списка подходящих файлов для exiftool, где каждый item - полный путь;
-	var forExifTool []string
 
 	err := filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -172,13 +169,12 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 		check(err)
 	}
 
-	return dirFiles, forExifTool
+	return
 }
 
-func fileToProcessing(file string, logger *log.Logger) processingAttr {
+func fileToProcessing(file string, logger *log.Logger) (filematched processingAttr) {
 	patternToSkip := `(^\d{4}-\d{2}-\d{2}_\d{6}\.)|(^\d{4}-\d{2}-\d{2}_\d{6}\(\d+\)\.)`
 	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}`
-	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
 	if verbose {
 		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
@@ -189,25 +185,25 @@ func fileToProcessing(file string, logger *log.Logger) processingAttr {
 			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
 		}
 		filematched.toSkip = true
-		return filematched
+		return
 	case match(patternToSkip, fileNameBase):
 		if verbose {
 			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
 		}
 		filematched.toSkip = true
-		return filematched
+		return
 	case match(patternDateInName, fileNameBase):
 		if verbose {
 			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by DateInName")
 		}
 		filematched.doByName = true
-		return filematched
+		return
 	default:
 		if verbose {
 			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")
 		}
 		filematched.doByExiftool = true
-		return filematched
+		return
 	}
 }
 func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
@@ -226,12 +222,9 @@ func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
 
 	for _, jobs := range batches {
 		for _, path := range jobs {
-			// wg.Add(1)
-			go md5Calculate(path, calcMd5chan, logger) //, &wg)
+			go md5Calculate(path, calcMd5chan, logger)
 		}
-		// wg.Wait()
-		for i := 0; i < len(jobs); i++ {
-			itemMd5 := <-calcMd5chan
+		for itemMd5 := range calcMd5chan {
 			allFilesMap[itemMd5.strPath] = itemMd5.hash
 		}
 	}
@@ -260,8 +253,7 @@ func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
 	}
 	return nil
 }
-func md5Calculate(s string, channel chan resultMd5, logger *log.Logger) { //, wg *sync.WaitGroup) {
-	// defer wg.Done()
+func md5Calculate(s string, channel chan resultMd5, logger *log.Logger) {
 	f, err := os.Open(s)
 	if err != nil {
 		log.Panic(err)
