@@ -59,7 +59,7 @@ func SetWorkDir(s string) {
 }
 
 //Check or ask workdir
-func checkWorkDir(logger *log.Logger) (workDir string) {
+func checkWorkDir(logger *log.Logger) string {
 	if workDir != "" {
 		if !checkPath(workDir) {
 			log.Fatal("Dir is not exist")
@@ -74,10 +74,10 @@ func checkWorkDir(logger *log.Logger) (workDir string) {
 			log.Fatal("Dir is not exist")
 		}
 		logger.Printf("Your choise is a: %v\n", workDir)
-		//search for duplicates
-		//enable verbose mode?
+		//toDo: ask search for duplicates
+		//toDo: ask enable verbose mode
 	}
-	return
+	return workDir
 }
 func check(err error) {
 	if err != nil {
@@ -95,7 +95,7 @@ func checkEt(logger *log.Logger) {
 		exiftoolExist = true
 	} else {
 		logger.Println("ExifTool not found!")
-		logger.Println("Will be processed only files who have TimeStamp in the name.")
+		logger.Println("Will be processed only files who have TimeStamp in the name.") //check it in func:::fileToProcessing
 		exiftoolExist = false
 	}
 }
@@ -199,40 +199,46 @@ func fileToProcessing(file string, logger *log.Logger) (filematched processingAt
 		filematched.doByName = true
 		return
 	default:
-		if verbose {
-			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by doExif")
+		if exiftoolExist {
+			if verbose {
+				logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; NO pattern -> added to doExif")
+			}
+			filematched.doByExiftool = true
 		}
-		filematched.doByExiftool = true
-		return
+		if !exiftoolExist {
+			if verbose {
+				logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; NO pattern -> SKIP")
+			}
+			filematched.toSkip = true
+		}
+		return filematched
 	}
 }
-func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
-	// var wg sync.WaitGroup
-	calcMd5chan := make(chan resultMd5)
-	allFilesPath := []string{}
-	for k := range allFilesMap {
-		allFilesPath = append(allFilesPath, k)
+func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
+	calcMd5chan := make(chan resultMd5, 5) //toDo: if ssd - need 50, hdd - 5
+	var allPath []string
+	for key := range allFiles {
+		allPath = append(allPath, key)
 	}
-	batchSize := 10
-	batches := make([][]string, 0, (len(allFilesPath)+batchSize-1)/batchSize)
-	for batchSize < len(allFilesPath) {
-		allFilesPath, batches = allFilesPath[batchSize:], append(batches, allFilesPath[0:batchSize:batchSize])
-	}
-	batches = append(batches, allFilesPath)
-
-	for _, jobs := range batches {
-		for _, path := range jobs {
-			go md5Calculate(path, calcMd5chan, logger)
-		}
-		for itemMd5 := range calcMd5chan {
-			allFilesMap[itemMd5.strPath] = itemMd5.hash
+	for i := 0; i <= (len(allPath) - 1); {
+		if len(calcMd5chan) < 5 {
+			go md5Calculate(allPath[i], calcMd5chan, logger)
+			i++
+			// logger.Println("Run gorutine #", i, " now total: ", len(calcMd5chan))
+		} else {
+			continue
 		}
 	}
 
-	for key, val := range allFilesMap {
-		delete(allFilesMap, key)
+	for _ = range allPath {
+		res := <-calcMd5chan
+		allFiles[res.strPath] = res.hash
+	}
+
+	for key, val := range allFiles {
+		delete(allFiles, key)
 		foundDubles := []string{}
-		for k, v := range allFilesMap {
+		for k, v := range allFiles {
 			res := bytes.Compare(v, val)
 			if res == 0 && k != key {
 				logger.Println("Found dublicate of file: ", key, "\n\t--->", k)
@@ -241,7 +247,7 @@ func dublesChecking(allFilesMap map[string][]byte, logger *log.Logger) error {
 		}
 		if len(foundDubles) > 0 {
 			for _, item := range foundDubles {
-				delete(allFilesMap, item)
+				delete(allFiles, item)
 				err := os.Remove(item)
 				check(err)
 				if verbose {
@@ -264,7 +270,7 @@ func md5Calculate(s string, channel chan resultMd5, logger *log.Logger) {
 	if _, err := io.Copy(h, f); err != nil {
 		log.Panic(err)
 	}
-	channel <- resultMd5{strPath: s, hash: h.Sum(nil)}
+	channel <- resultMd5{s, h.Sum(nil)}
 }
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
