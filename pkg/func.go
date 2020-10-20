@@ -32,9 +32,7 @@ type calcMd5 struct {
 var exiftoolExist, verbose, checkDublesFlag bool
 var removedCount, skippedCount int
 var timeNow = time.Now()
-var exifBirthday int64 = 2002
 var workDir string
-var allFiles = make(map[string][]byte)
 var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 var defNewNameLayout = "2006-01-02_150405"
 
@@ -103,6 +101,7 @@ func checkEt(logger *log.Logger) {
 }
 
 func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string) {
+	var allFiles = make(map[string][]byte)
 	logger.Println("Started search of supported files on selected path.")
 	//fileExt: array fo file extensions to processing
 	fileExt := []string{
@@ -165,8 +164,8 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 		logger.Printf("error walking the path %q: %v\n", workDir, err)
 		log.Panic(err)
 	}
-	logger.Println("Found " + strconv.Itoa(len(dirFiles)) + " files for processing without exiftool")
-	logger.Println("Found " + strconv.Itoa(len(forExifTool)) + " files for processing via exiftool")
+	logger.Println("Found ", len(dirFiles), " files for processing without exiftool")
+	logger.Println("Found ", len(forExifTool), " files for processing via exiftool")
 
 	if checkDublesFlag {
 
@@ -207,13 +206,13 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) ([]string, []string
 }
 
 func fileToProcessing(file string, logger *log.Logger) processingAttr {
+	patternToSkip := `(^\d{4}-\d{2}-\d{2}_\d{6}\.)|(^\d{4}-\d{2}-\d{2}_\d{6}\(\d+\)\.)`
+	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}`
 	var filematched processingAttr
 	fileNameBase := filepath.Base(file)
 	if verbose {
 		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
 	}
-	patternToSkip := `(^\d{4}-\d{2}-\d{2}_\d{6}\.)|(^\d{4}-\d{2}-\d{2}_\d{6}\(\d+\)\.)`       //шаблон файлов обработанных раннее
-	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}` //шаблон файлов имеющих дату в имени
 	switch {
 	case match(`^\..*`, fileNameBase):
 		if verbose {
@@ -381,6 +380,7 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 	return newName, nil
 }
 func areDateActual(result map[string]string, logger *log.Logger) error {
+	var exifBirthday int64 = 2002
 	parseStr := result["year"] + result["month"] + result["day"] + result["hour"] + result["min"] + result["sec"]
 	parseTime, err := time.Parse("20060102150405", parseStr)
 	if err != nil {
