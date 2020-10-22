@@ -220,11 +220,11 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 	for key := range allFiles {
 		allPath = append(allPath, key)
 	}
-	for i := 0; i <= (len(allPath) - 1); {
+	lastIndex := len(allPath) - 1
+	for i := 0; i <= lastIndex; {
 		if len(calcMd5chan) < 5 {
 			go md5Calculate(allPath[i], calcMd5chan, logger)
 			i++
-			// logger.Println("Run gorutine #", i, " now total: ", len(calcMd5chan))
 		} else {
 			continue
 		}
