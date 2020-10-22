@@ -33,6 +33,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.Flags().BoolP("verbose", "v", false, "set verbose output")
+	rootCmd.Flags().Bool("ssd", false, "set fast access mode to files")
 	rootCmd.Flags().Bool("check-dublicates", false, "to check files dublicates")
 	rootCmd.Flags().String("dir", "", "Put the path to directory")
 }
@@ -43,6 +44,9 @@ func initConfig() {
 	}
 	if checkDubleStatus, err := rootCmd.Flags().GetBool("check-dublicates"); err == nil {
 		pkg.SetCheckDublesFlag(checkDubleStatus)
+	}
+	if ssd, err := rootCmd.Flags().GetBool("ssd"); err == nil {
+		pkg.SetFastAccessFlag(ssd)
 	}
 	wdir, err := rootCmd.Flags().GetString("dir")
 	if err == nil && wdir != "" {

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -24,23 +25,33 @@ type processingAttr struct {
 	doByName     bool
 	doByExiftool bool
 }
-type resultMd5 struct {
-	strPath string
-	hash    []byte
-}
 
-var exiftoolExist, verbose, checkDublesFlag bool
+var exiftoolExist, verbose, checkDublesFlag, ssd bool
 var removedCount, skippedCount int
 var timeNow = time.Now()
 var workDir string
 var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 var defNewNameLayout = "2006-01-02_150405"
 
+//SetFastAccessFlag to assign verbose output
+func SetFastAccessFlag(value bool) {
+	if ssd {
+		ssd = value
+		fmt.Printf("Setted fast access mode to files flag: %v\n", value)
+	}
+}
+
 //SetVerbose to assign verbose output
 func SetVerbose(v bool) {
 	if v {
 		verbose = v
 		fmt.Printf("Setted verbose flag: %v\n", v)
+	}
+}
+
+func verboseOut(l *log.Logger, s string) {
+	if verbose {
+		l.Println(s)
 	}
 }
 
@@ -79,11 +90,13 @@ func checkWorkDir(logger *log.Logger) string {
 	}
 	return workDir
 }
+
 func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
 }
+
 func checkEt(logger *log.Logger) {
 	out, err := exec.Command("/usr/bin/env", "exiftool", "-ver").Output()
 	if err == nil {
@@ -135,9 +148,9 @@ func walkingOnFilesystem(workDir string, logger *log.Logger) (dirFiles, forExifT
 			logger.Printf("skipping a dir without errors: %+v \n", info.Name())
 			return filepath.SkipDir
 		}
-		if verbose {
-			logger.Printf("visited file or dir: %q\n", path)
-		}
+
+		verboseOut(logger, fmt.Sprintf("visited file or dir: %q", path))
+
 		//проверка на подходящее расширение файла
 		if _, ok := find(fileExt, filepath.Ext(strings.ToLower(path))); ok {
 			if checkDublesFlag {
@@ -176,63 +189,112 @@ func fileToProcessing(file string, logger *log.Logger) (filematched processingAt
 	patternToSkip := `(^\d{4}-\d{2}-\d{2}_\d{6}\.)|(^\d{4}-\d{2}-\d{2}_\d{6}\(\d+\)\.)`
 	patternDateInName := `.*\d{4}[\._:-]?\d{2}[\._:-]?\d{2}.+\d{2}[\._:-]?\d{2}[\._:-]?\d{2}`
 	fileNameBase := filepath.Base(file)
-	if verbose {
-		logger.Println("fileToProcessing; basename of file to processing: " + fileNameBase)
-	}
+	verboseOut(logger, fmt.Sprintf("fileToProcessing; basename of file to processing: "+fileNameBase))
+
 	switch {
 	case match(`^\..*`, fileNameBase):
-		if verbose {
-			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
-		}
+		verboseOut(logger, fmt.Sprintf("fName: "+fileNameBase+" func: fileToProcessing:match; skip file"))
 		filematched.toSkip = true
 		return
 	case match(patternToSkip, fileNameBase):
-		if verbose {
-			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; skip file")
-		}
+		verboseOut(logger, fmt.Sprintf("fName: "+fileNameBase+" func: fileToProcessing:match; skip file"))
 		filematched.toSkip = true
 		return
 	case match(patternDateInName, fileNameBase):
-		if verbose {
-			logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; pattern by DateInName")
-		}
+		verboseOut(logger, fmt.Sprintf("fName: "+fileNameBase+" func: fileToProcessing:match; pattern by DateInName"))
 		filematched.doByName = true
 		return
 	default:
 		if exiftoolExist {
-			if verbose {
-				logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; NO pattern -> added to doExif")
-			}
+			verboseOut(logger, fmt.Sprintf("fName: "+fileNameBase+" func: fileToProcessing:match; NO pattern -> added to doExif"))
 			filematched.doByExiftool = true
 		}
 		if !exiftoolExist {
-			if verbose {
-				logger.Println("fName: " + fileNameBase + " func: fileToProcessing:match; NO pattern -> SKIP")
-			}
+			verboseOut(logger, fmt.Sprintf("fName: "+fileNameBase+" func: fileToProcessing:match; NO pattern -> SKIP"))
 			filematched.toSkip = true
 		}
 		return filematched
 	}
 }
+
 func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
-	calcMd5chan := make(chan resultMd5, 5) //toDo: if ssd - need 50, hdd - 5
+	var workerCount int
+	if ssd {
+		workerCount = runtime.GOMAXPROCS(0)
+	} else {
+		workerCount = 1
+	}
+	logger.Printf("Using %v worker.\n", workerCount)
+	type resultMd5 struct {
+		strPath string
+		hash    []byte
+		done    bool
+	}
+	type calcMd5 struct {
+		strPath  string
+		lastItem bool
+	}
+	calcMd5Chan := make(chan calcMd5)
+	resultMd5Chan := make(chan resultMd5)
+
 	var allPath []string
 	for key := range allFiles {
 		allPath = append(allPath, key)
 	}
-	lastIndex := len(allPath) - 1
-	for i := 0; i <= lastIndex; {
-		if len(calcMd5chan) < 5 {
-			go md5Calculate(allPath[i], calcMd5chan, logger)
+
+	go func(forMD5 chan<- calcMd5) {
+		lastItem := false
+		i := 0
+		for {
+			if i == len(allPath)-1 {
+				lastItem = true
+			}
+			forMD5 <- calcMd5{allPath[i], lastItem}
 			i++
-		} else {
-			continue
+			if i == len(allPath) {
+				close(calcMd5Chan)
+				return
+			}
+		}
+	}(calcMd5Chan)
+
+	for w := 0; w < workerCount; w++ {
+		go func(pathChan <-chan calcMd5, resultChan chan<- resultMd5) {
+			for job := range pathChan {
+				f, err := os.Open(job.strPath)
+				if err != nil {
+					logger.Panic(err)
+				} else {
+					defer f.Close()
+				}
+				h := md5.New()
+				logger.Println("Calculate md5 hash of file: ", job.strPath)
+				if _, err := io.Copy(h, f); err != nil {
+					logger.Panicln(err)
+				}
+				md5hash := h.Sum(nil)
+				resultChan <- resultMd5{job.strPath, md5hash, job.lastItem}
+			}
+		}(calcMd5Chan, resultMd5Chan)
+	}
+
+	receivedCounter := 0
+	for result := range resultMd5Chan {
+		allFiles[result.strPath] = result.hash
+		receivedCounter++
+		if receivedCounter == len(allPath) && result.done {
+			close(resultMd5Chan)
 		}
 	}
 
-	for _ = range allPath {
-		res := <-calcMd5chan
-		allFiles[res.strPath] = res.hash
+	emptyHash := []string{}
+	for path, hash := range allFiles {
+		if len(hash) == 0 {
+			emptyHash = append(emptyHash, path)
+		}
+		if len(emptyHash) > 0 {
+			logger.Panicln("---------------------> Check md5sum failed. Empty field: ", path)
+		}
 	}
 
 	for key, val := range allFiles {
@@ -250,28 +312,14 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 				delete(allFiles, item)
 				err := os.Remove(item)
 				check(err)
-				if verbose {
-					logger.Println("Removed file: ", item)
-				}
+				verboseOut(logger, fmt.Sprintf("Removed file: %v", item))
 				removedCount++
 			}
 		}
 	}
 	return nil
 }
-func md5Calculate(s string, channel chan resultMd5, logger *log.Logger) {
-	f, err := os.Open(s)
-	if err != nil {
-		log.Panic(err)
-	}
-	defer f.Close()
-	logger.Println("Calculate md5sum of: ", s)
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		log.Panic(err)
-	}
-	channel <- resultMd5{s, h.Sum(nil)}
-}
+
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if os.IsNotExist(err) {
@@ -279,6 +327,7 @@ func fileExists(filename string) bool {
 	}
 	return !info.IsDir()
 }
+
 func checkPath(somePath string) bool {
 	info, err := os.Stat(somePath)
 	if os.IsNotExist(err) {
@@ -286,6 +335,7 @@ func checkPath(somePath string) bool {
 	}
 	return info.IsDir()
 }
+
 func find(slice []string, val string) (int, bool) {
 	for i, item := range slice {
 		if strings.ToLower(item) == val {
@@ -294,11 +344,13 @@ func find(slice []string, val string) (int, bool) {
 	}
 	return -1, false
 }
+
 func match(pattern string, text string) bool {
 	m, err := regexp.Match(pattern, []byte(text))
 	check(err)
 	return m
 }
+
 func renamer(fullPath string, newName string, logger *log.Logger) {
 	logger.Println("renamer:start, newName: " + newName)
 	path := filepath.Dir(fullPath) + "/"
@@ -318,14 +370,14 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 	err := os.Rename(fullPath, fullNewName)
 	check(err)
 }
+
 func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
 	newName := ""
 	allDetectedDate := make(map[string]time.Time)
 	fileInfos := et.ExtractMetadata(filePath)
 	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time", "FileModifyDate"}
-	if verbose {
-		logger.Println("Exif data of the file: \n", fileInfos[0].Fields)
-	}
+	verboseOut(logger, fmt.Sprintf("Exif data of the file: %v", fileInfos[0].Fields))
+
 	for _, fileInfo := range fileInfos {
 		if fileInfo.Err != nil {
 			logger.Printf("Error concerning %v: %v\n", fileInfo.File, fileInfo.Err)
@@ -360,6 +412,7 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 	}
 	return "", errors.New("ERROR: exif data corrupted")
 }
+
 func fsTimeStamp(item string) (string, error) {
 	fInfo, err := os.Stat(item)
 	if err != nil {
@@ -369,6 +422,7 @@ func fsTimeStamp(item string) (string, error) {
 	fModTimeNewName := fTimestamp.Format(defNewNameLayout)
 	return fModTimeNewName, nil
 }
+
 func useFSTimeStamp(fPath string, logger *log.Logger) error {
 	newName, err := fsTimeStamp(fPath)
 	if err != nil {
@@ -382,6 +436,7 @@ func useFSTimeStamp(fPath string, logger *log.Logger) error {
 	renamer(fPath, newName, logger)
 	return nil
 }
+
 func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 	exifSliceParsed := timeExp.FindStringSubmatch(str)
 	result := make(map[string]string)
@@ -398,6 +453,7 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 	newName := result["year"] + "-" + result["month"] + "-" + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
 	return newName, nil
 }
+
 func areDateActual(result map[string]string, logger *log.Logger) error {
 	var exifBirthday int64 = 2002
 	parseStr := result["year"] + result["month"] + result["day"] + result["hour"] + result["min"] + result["sec"]
