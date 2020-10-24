@@ -234,7 +234,7 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 		strPath  string
 		lastItem bool
 	}
-	calcMd5Chan := make(chan calcMd5, workerCount)
+	calcMd5Chan := make(chan calcMd5)
 	resultMd5Chan := make(chan resultMd5)
 
 	var allPath []string
@@ -249,13 +249,11 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 			if i == len(allPath)-1 {
 				lastItem = true
 			}
-			select {
-			case forMD5 <- calcMd5{allPath[i], lastItem}:
-				i++
-				if i == len(allPath) {
-					close(calcMd5Chan)
-					return
-				}
+			forMD5 <- calcMd5{allPath[i], lastItem}
+			i++
+			if i == len(allPath) {
+				close(calcMd5Chan)
+				return
 			}
 		}
 	}(calcMd5Chan)
@@ -266,8 +264,6 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 				f, err := os.Open(job.strPath)
 				if err != nil {
 					logger.Panic(err)
-				} else {
-					defer f.Close()
 				}
 				h := md5.New()
 				logger.Println("Calculate md5 hash of file: ", job.strPath)
@@ -275,6 +271,7 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 					logger.Panicln(err)
 				}
 				md5hash := h.Sum(nil)
+				f.Close()
 				resultChan <- resultMd5{job.strPath, md5hash, job.lastItem}
 			}
 		}(calcMd5Chan, resultMd5Chan)
