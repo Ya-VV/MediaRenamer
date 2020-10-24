@@ -234,7 +234,7 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 		strPath  string
 		lastItem bool
 	}
-	calcMd5Chan := make(chan calcMd5)
+	calcMd5Chan := make(chan calcMd5, workerCount)
 	resultMd5Chan := make(chan resultMd5)
 
 	var allPath []string
@@ -249,11 +249,13 @@ func dublesChecking(allFiles map[string][]byte, logger *log.Logger) error {
 			if i == len(allPath)-1 {
 				lastItem = true
 			}
-			forMD5 <- calcMd5{allPath[i], lastItem}
-			i++
-			if i == len(allPath) {
-				close(calcMd5Chan)
-				return
+			select {
+			case forMD5 <- calcMd5{allPath[i], lastItem}:
+				i++
+				if i == len(allPath) {
+					close(calcMd5Chan)
+					return
+				}
 			}
 		}
 	}(calcMd5Chan)
