@@ -36,6 +36,7 @@ func init() {
 	rootCmd.Flags().Bool("ssd", false, "set fast access mode to files")
 	rootCmd.Flags().Bool("check-dublicates", false, "to check files dublicates")
 	rootCmd.Flags().String("dir", "", "Put the path to directory")
+	rootCmd.Flags().String("outdir", "", "Put the fullpath to  out directory")
 }
 
 func initConfig() {
@@ -51,5 +52,9 @@ func initConfig() {
 	wdir, err := rootCmd.Flags().GetString("dir")
 	if err == nil && wdir != "" {
 		pkg.SetWorkDir(wdir)
+	}
+	outdir, err := rootCmd.Flags().GetString("outdir")
+	if err == nil && wdir != "" {
+		pkg.SetOutFolder(true, outdir)
 	}
 }

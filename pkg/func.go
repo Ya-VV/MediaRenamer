@@ -26,12 +26,22 @@ type processingAttr struct {
 	doByExiftool bool
 }
 
-var exiftoolExist, verbose, checkDublesFlag, ssd bool
+var exiftoolExist, verbose, checkDublesFlag, ssd, outFolderIs bool
 var removedCount, skippedCount int
 var timeNow = time.Now()
 var workDir string
 var timeExp = regexp.MustCompile(`.*(?P<year>\d{4})[\._:-]?(?P<month>\d{2})[\._:-]?(?P<day>\d{2}).+(?P<hour>\d{2})[\._:-]?(?P<min>\d{2})[\._:-]?(?P<sec>\d{2}).*`)
 var defNewNameLayout = "2006-01-02_150405"
+var outDirList = make(map[string]bool)
+var outFolder string
+
+//SetOutFolder path to move ranmed files
+func SetOutFolder(ok bool, s string) {
+	if ok {
+		outFolderIs = true
+		outFolder = s
+	}
+}
 
 //SetFastAccessFlag to assign verbose output
 func SetFastAccessFlag(value bool) {
@@ -350,19 +360,30 @@ func match(pattern string, text string) bool {
 	return m
 }
 
-func renamer(fullPath string, newName string, logger *log.Logger) {
+func renamer(fullPath, newName, outPath string, logger *log.Logger) {
 	logger.Println("renamer:start, newName: " + newName)
-	path := filepath.Dir(fullPath) + "/"
+	logger.Println("fullPath: ", fullPath)
+	logger.Println("newName: ", newName)
+	logger.Println("outPath: ", outPath)
 	extFile := filepath.Ext(fullPath)
-	fullNewName := path + newName + extFile
+	var fullNewName string
+	if outFolderIs {
+		fullNewName = outPath + string(os.PathSeparator) + newName + extFile
+		logger.Println("fullNewName: ", fullNewName)
+
+	} else {
+		outPath = filepath.Dir(fullPath) + string(os.PathSeparator)
+		fullNewName = outPath + newName + extFile
+		logger.Println("fullNewName: ", fullNewName)
+	}
 	logger.Println("renamer:newFullName: " + fullNewName)
 	if fileExists(fullNewName) {
 		nextName := newName
 		logger.Println("renamer:fileExists, newName: " + newName)
-		for count := 1; fileExists(path + nextName + extFile); count++ {
+		for count := 1; fileExists(outPath + string(os.PathSeparator) + nextName + extFile); count++ {
 			nextName = newName + "(" + strconv.Itoa(count) + ")"
 		}
-		fullNewName = path + nextName + extFile
+		fullNewName = outPath + string(os.PathSeparator) + nextName + extFile
 		logger.Println("renamer:fileExists, newFullName: " + fullNewName)
 	}
 
@@ -370,8 +391,8 @@ func renamer(fullPath string, newName string, logger *log.Logger) {
 	check(err)
 }
 
-func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, error) {
-	newName := ""
+func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string, string, error) {
+	var newName, suppositionName string
 	allDetectedDate := make(map[string]time.Time)
 	fileInfos := et.ExtractMetadata(filePath)
 	fileExifStrings := []string{"CreateDate", "Create Date", "DateTimeOriginal", "Date/Time Original", "ModifyDate", "Modify Date", "Date", "Profile Date Time", "Media Create Date", "Media Modify Date", "Track Create Date", "Track Modify Date", "File Modification Date/Time", "FileModifyDate"}
@@ -386,7 +407,7 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 			exifTime, err := fileInfo.GetString(exifString)
 			if err == nil {
 				logger.Printf("getExif:checkField; Exif field <<<%v>>> matched\n", exifString)
-				suppositionName, err := parseAndCheckDate(exifTime, logger)
+				suppositionName, _, err = parseAndCheckDate(exifTime, logger)
 				if err != nil {
 					logger.Println("ERROR: exif data corrupted. Checking next exif string.")
 					continue
@@ -407,9 +428,11 @@ func getExif(et *exiftool.Exiftool, filePath string, logger *log.Logger) (string
 				}
 			}
 		}
-		return newName, nil
+		outPath, err := prepareOutPath(newName[:4], newName[5:7])
+		check(err)
+		return newName, outPath, nil
 	}
-	return "", errors.New("ERROR: exif data corrupted")
+	return "", "", errors.New("ERROR: exif data corrupted")
 }
 
 func fsTimeStamp(item string) (string, error) {
@@ -427,16 +450,17 @@ func useFSTimeStamp(fPath string, logger *log.Logger) error {
 	if err != nil {
 		return err
 	}
-	_, err = parseAndCheckDate(newName, logger)
+	//need check after add outDir function
+	_, outPath, err := parseAndCheckDate(newName, logger)
 	if err != nil {
 		return err
 	}
 	logger.Println("fsTimeStamp:rename; newName: " + newName)
-	renamer(fPath, newName, logger)
+	renamer(fPath, newName, outPath, logger)
 	return nil
 }
 
-func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
+func parseAndCheckDate(str string, logger *log.Logger) (string, string, error) {
 	exifSliceParsed := timeExp.FindStringSubmatch(str)
 	result := make(map[string]string)
 	for i, name := range timeExp.SubexpNames() {
@@ -447,10 +471,15 @@ func parseAndCheckDate(str string, logger *log.Logger) (string, error) {
 	err := areDateActual(result, logger)
 	if err != nil {
 		logger.Println(err)
-		return "", err
+		return "", "", err
 	}
 	newName := result["year"] + "-" + result["month"] + "-" + result["day"] + "_" + result["hour"] + result["min"] + result["sec"]
-	return newName, nil
+	if outFolderIs {
+		outPath, err := prepareOutPath(result["year"], result["month"])
+		check(err)
+		return newName, outPath, nil
+	}
+	return newName, "", nil
 }
 
 func areDateActual(result map[string]string, logger *log.Logger) error {
@@ -460,10 +489,23 @@ func areDateActual(result map[string]string, logger *log.Logger) error {
 	if err != nil {
 		return err
 	}
-	if parseTime.Year() > timeNow.Year() {
-		return fmt.Errorf("Parsed year is corrupted: %v. Biger that now: %v", parseTime.Year(), timeNow.Year())
+	if parseTime.After(timeNow) {
+		return fmt.Errorf("Parsed date is corrupted: %v. Biger that now: %v", parseTime, timeNow)
 	} else if int64(parseTime.Year()) < exifBirthday {
 		return fmt.Errorf("Parsed year is corrupted: %v. Less that exifBirthday: %v", int64(parseTime.Year()), exifBirthday)
 	}
 	return nil
+}
+
+func prepareOutPath(year, month string) (string, error) {
+	outPath := filepath.Join(outFolder, year, month)
+	if _, ok := outDirList[outPath]; ok {
+		return outPath, nil
+	}
+
+	err := os.MkdirAll(outPath, 0700)
+	if err == nil {
+		outDirList[outPath] = true
+	}
+	return outPath, err
 }

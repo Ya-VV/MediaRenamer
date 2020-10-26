@@ -31,22 +31,22 @@ func LetsGo() {
 
 	checkEt(logger)
 	workDir = checkWorkDir(logger)
-	dirFiles, forExifTool := walkingOnFilesystem(workDir, logger)
-	totalFiles := len(dirFiles) + len(forExifTool)
+	dateInName, forExifTool := walkingOnFilesystem(workDir, logger)
+	totalFiles := len(dateInName) + len(forExifTool)
 	if totalFiles == 0 {
 		logger.Println("Nothin to do!\nBye :)")
 		os.Exit(0)
 	}
 
-	if len(dirFiles) > 0 {
-		for _, item := range dirFiles {
+	if len(dateInName) > 0 {
+		for _, item := range dateInName {
 			if !fileExists(item) {
 				continue
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
-			newName, err := parseAndCheckDate(filepath.Base(item), logger)
+			newName, outPath, err := parseAndCheckDate(filepath.Base(item), logger)
 			if err == nil {
-				renamer(item, newName, logger)
+				renamer(item, newName, outPath, logger)
 				logger.Println("DateInName: new name is a: " + newName + " of file: " + item)
 			} else {
 				logger.Println(err)
@@ -71,7 +71,7 @@ func LetsGo() {
 				continue
 			}
 			logger.SetPrefix(filepath.Base(item) + " ")
-			exifDateParsed, err := getExif(et, item, logger)
+			exifDateParsed, outPath, err := getExif(et, item, logger)
 			if err != nil { //if getExif data is failed
 				logger.Println("func:fsTimeStamp; when exif data corrupted.")
 				err := useFSTimeStamp(item, logger)
@@ -82,7 +82,7 @@ func LetsGo() {
 					skippedCount++
 				}
 			} else {
-				renamer(item, exifDateParsed, logger)
+				renamer(item, exifDateParsed, outPath, logger)
 				logger.Println("exifToolRename; newName: " + exifDateParsed)
 			}
 		}
